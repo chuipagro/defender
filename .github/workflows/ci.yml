@@ -1,0 +1,67 @@
+name: CI — Build & Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (ubuntu-22.04)
+    runs-on: ubuntu-22.04
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ── System dependencies ─────────────────────────────────────────────────
+      # SFML build dependencies + virtual framebuffer for headless display
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build \
+            libgl1-mesa-dev \
+            libudev-dev \
+            libfreetype6-dev \
+            libopenal-dev \
+            libvorbis-dev \
+            libflac-dev \
+            xvfb
+
+      # ── Cache CMake build directory ─────────────────────────────────────────
+      - name: Cache CMake dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: cmake-deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: cmake-deps-${{ runner.os }}-
+
+      # ── Configure ───────────────────────────────────────────────────────────
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build
+        run: cmake --build build --parallel
+
+      # ── Test ─────────────────────────────────────────────────────────────────
+      # xvfb-run provides a virtual display in case any test needs SFML rendering
+      - name: Run tests
+        run: xvfb-run -a ctest --test-dir build --output-on-failure --parallel 4
+
+      # ── Upload test results on failure ────────────────────────────────────────
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/Testing/
+          retention-days: 7

@@ -1,0 +1,50 @@
+# ── Build directories ─────────────────────────────────────────────────────────
+build/
+cmake-build-debug/
+cmake-build-release/
+cmake-build-*/
+out/
+dist/
+
+# ── IDE / Editor ──────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.user
+*.suo
+.vs/
+*.swp
+*~
+
+# ── CMake generated ───────────────────────────────────────────────────────────
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+CPackConfig.cmake
+compile_commands.json
+_deps/
+
+# ── Compiled objects ───────────────────────────────────────────────────────────
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lib
+*.exe
+
+# ── Test output ────────────────────────────────────────────────────────────────
+Testing/
+*.xml
+
+# ── Assets (track sources; ignore generated/binary blobs) ────────────────────
+# Uncomment lines below if you use Git LFS for binary assets:
+# assets/*.png
+# assets/*.jpg
+# assets/*.wav
+# assets/*.ogg
+# assets/*.ttf
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store

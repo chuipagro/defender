@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  release-linux:
+    name: Package Linux Release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write   # needed to create/upload the GitHub Release
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ── Dependencies ─────────────────────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build \
+            libgl1-mesa-dev \
+            libudev-dev \
+            libfreetype6-dev \
+            libopenal-dev \
+            libvorbis-dev \
+            libflac-dev
+
+      # ── Cache ────────────────────────────────────────────────────────────────
+      - name: Cache CMake dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: cmake-deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+
+      # ── Configure + Build ────────────────────────────────────────────────────
+      - name: Configure CMake (Release)
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      # ── Strip binary ─────────────────────────────────────────────────────────
+      - name: Strip binary
+        run: strip build/src/defender
+
+      # ── Package ──────────────────────────────────────────────────────────────
+      - name: Package tarball
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          ARCHIVE="defender-${VERSION}-linux-x86_64.tar.gz"
+          mkdir -p dist/defender
+          cp build/src/defender dist/defender/
+          # Include assets if they exist
+          [ -d assets ] && cp -r assets dist/defender/ || true
+          cp README.md dist/defender/ 2>/dev/null || true
+          tar -czf "${ARCHIVE}" -C dist defender
+          echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
+
+      # ── Publish the Release Drafter draft ────────────────────────────────────
+      # release-drafter already created a draft with curated notes.
+      # We publish it here and attach the binary.
+      - name: Publish GitHub Release
+        uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter.yml
+          publish: true
+          tag: ${{ github.ref_name }}
+          name: "Defender ${{ github.ref_name }}"
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: ${{ env.ARCHIVE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
