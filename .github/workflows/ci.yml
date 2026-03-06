@@ -31,6 +31,11 @@ jobs:
             libopenal-dev \
             libvorbis-dev \
             libflac-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
             xvfb
 
       # ── Cache CMake build directory ─────────────────────────────────────────

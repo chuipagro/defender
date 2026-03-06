@@ -30,7 +30,12 @@ jobs:
             libfreetype6-dev \
             libopenal-dev \
             libvorbis-dev \
-            libflac-dev
+            libflac-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev
 
       # ── Cache ────────────────────────────────────────────────────────────────
       - name: Cache CMake dependencies
