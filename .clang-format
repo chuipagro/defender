@@ -1,0 +1,51 @@
+---
+# clang-format configuration for the Defender Tower Defense project (C++20)
+# Base: Google style with custom overrides for readability
+BasedOnStyle: Google
+Language: Cpp
+Standard: c++20
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+
+# Column limit
+ColumnLimit: 100
+
+# Braces
+BreakBeforeBraces: Allman
+
+# Include ordering
+SortIncludes: CaseInsensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Project headers
+  - Regex:    '^"defender/'
+    Priority: 1
+  # SFML
+  - Regex:    '^<SFML/'
+    Priority: 2
+  # Standard library
+  - Regex:    '^<[a-z_]+>'
+    Priority: 3
+
+# Alignment / spacing
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: None
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 1
+PointerAlignment: Left
+SpaceBeforeParens: ControlStatements
+SpaceAfterTemplateKeyword: true
+
+# Modern C++ features
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Line breaks
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1

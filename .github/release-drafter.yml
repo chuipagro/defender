@@ -1,0 +1,81 @@
+# Release Drafter configuration
+# https://github.com/release-drafter/release-drafter
+#
+# Labels to apply on PRs (create them in GitHub → Issues → Labels):
+#   breaking, feature, enhancement, bug, performance, docs, chore, dependencies
+
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+# ── Auto-label PRs from their title (Conventional Commits) ──────────────────
+# PR title format: "feat: add tower upgrade" | "fix(audio): crackling" | etc.
+autolabeler:
+  - label: 'breaking'
+    title:
+      - '/^break(ing)?(\(.+\))?!?:/i'
+  - label: 'feature'
+    title:
+      - '/^feat(\(.+\))?!?:/i'
+  - label: 'bug'
+    title:
+      - '/^fix(\(.+\))?!?:/i'
+  - label: 'performance'
+    title:
+      - '/^perf(\(.+\))?!?:/i'
+  - label: 'enhancement'
+    title:
+      - '/^refactor(\(.+\))?!?:/i'
+  - label: 'docs'
+    title:
+      - '/^docs?(\(.+\))?!?:/i'
+  - label: 'chore'
+    title:
+      - '/^(chore|test|ci|build|style)(\(.+\))?!?:/i'
+
+# Version bump rules based on PR labels
+version-resolver:
+  major:
+    labels:
+      - 'breaking'
+  minor:
+    labels:
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'bug'
+      - 'performance'
+      - 'docs'
+      - 'chore'
+      - 'dependencies'
+  default: patch
+
+categories:
+  - title: '💥 Breaking Changes'
+    labels: ['breaking']
+  - title: '🚀 New Features'
+    labels: ['feature']
+  - title: '✨ Enhancements'
+    labels: ['enhancement']
+  - title: '🐛 Bug Fixes'
+    labels: ['bug']
+  - title: '⚡ Performance'
+    labels: ['performance']
+  - title: '📖 Documentation'
+    labels: ['docs']
+  - title: '📦 Dependencies'
+    labels: ['dependencies']
+  - title: '🔧 Chores'
+    labels: ['chore']
+
+# Exclude PRs without labels from the notes? No — put them in "Other"
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escapes: '\<*_&'
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  ---
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
