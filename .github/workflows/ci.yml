@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  contents: write
+
 jobs:
   build-and-test:
     name: Build & Test (ubuntu-22.04)
@@ -72,9 +75,9 @@ jobs:
           retention-days: 7
 
       # ── deploy documentation ───────────────────────────────────────────────
-      - name: Deploy documentation
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: build/docs
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push'
+        run: |
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            mkdocs gh-deploy --force
