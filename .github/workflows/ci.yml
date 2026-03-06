@@ -1,4 +1,4 @@
-name: CI — Build & Test
+name: CI — Build, Test & Deploy
 
 on:
   push:
@@ -22,7 +22,6 @@ jobs:
           submodules: recursive
 
       # ── System dependencies ─────────────────────────────────────────────────
-      # SFML build dependencies + virtual framebuffer for headless display
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
@@ -61,7 +60,6 @@ jobs:
         run: cmake --build build --parallel
 
       # ── Test ─────────────────────────────────────────────────────────────────
-      # xvfb-run provides a virtual display in case any test needs SFML rendering
       - name: Run tests
         run: xvfb-run -a ctest --test-dir build --output-on-failure --parallel 4
 
@@ -74,35 +72,31 @@ jobs:
           path: build/Testing/
           retention-days: 7
 
-      # ── deploy documentation ───────────────────────────────────────────────
-  deploy:
+  deploy-docs:
+    name: Deploy Documentation
+    needs: build-and-test  # Only deploy if tests pass
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      steps:
-          - name: Checkout
-            uses: actions/checkout@v4
-            with:
-              fetch-depth: 0
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
 
-          - name: Set up Python
-            uses: actions/setup-python@v5
-            with:
-              python-version: '3.x'
-              cache: 'pip' # Optional: Speeds up future runs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-          - name: Install MkDocs and dependencies
-            run: |
-              python -m pip install --upgrade pip
-              pip install mkdocs-material mkdocs-material[imaging]
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          cache: 'pip'
 
-          - name: Deploy to GitHub Pages
-            if: github.event_name == 'push'
-            run: |
-              git config user.name "github-actions[bot]"
-              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              python -m mkdocs gh-deploy --force
+      - name: Install MkDocs and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install mkdocs-material mkdocs-material[imaging]
 
-          - name: Build only (PR preview check)
-            if: github.event_name == 'pull_request'
-            run: python -m mkdocs build --strict
+      - name: Deploy to GitHub Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python -m mkdocs gh-deploy --force
