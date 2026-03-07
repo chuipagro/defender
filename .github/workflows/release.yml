@@ -72,16 +72,13 @@ jobs:
           tar -czf "${ARCHIVE}" -C dist defender
           echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
 
-      # ── Publish the Release Drafter draft ────────────────────────────────────
-      # release-drafter already created a draft with curated notes.
-      # We publish it here and attach the binary.
+      # ── Publish GitHub Release ────────────────────────────────────────────────
+      # generate_release_notes: tous les commits (directs + PR) depuis le dernier tag
       - name: Publish GitHub Release
-        uses: release-drafter/release-drafter@v6
+        uses: softprops/action-gh-release@v2
         with:
-          config-name: release-drafter.yml
-          publish: true
-          tag: ${{ github.ref_name }}
           name: "Defender ${{ github.ref_name }}"
+          generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: ${{ env.ARCHIVE }}
         env:
