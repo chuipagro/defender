@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -33,10 +33,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -550,6 +550,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#enemyfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EnemyFactory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enemy-definitions-stats-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enemy definitions (stats + hooks)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enemy definitions (stats + hooks)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hooks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#current-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current definitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#super-boss-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Super boss split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wave-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wave composition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#wavemanager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -759,6 +831,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#enemyfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EnemyFactory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enemy-definitions-stats-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enemy definitions (stats + hooks)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enemy definitions (stats + hooks)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hooks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#current-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current definitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#super-boss-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Super boss split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wave-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wave composition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#wavemanager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -908,6 +1052,8 @@
         +render(RenderTarget&amp;)
         +takeDamage(amount: float)
         +getPosition() Vector2f
+        -type_ : EnemyType
+        -element_ : Element
         -path_ : span~Vector2f~
         -pathIndex_ : size_t
         -health_ : float
@@ -952,14 +1098,303 @@
 <pre class="mermaid"><code>classDiagram
     class EntityManager {
         +addTower(pos: Vector2f, type: TowerType) Tower&amp;
-        +spawnEnemy(type: EnemyType, path: span~Vector2f~) Enemy&amp;
+        +spawnEnemy(enemy: unique_ptr~Enemy~) Enemy&amp;
+        +nextId() EntityId
         +updateAll(dt: float)
         +renderAll(target: RenderTarget&amp;)
         +removeDeadEntities()
         -towers_ : vector~unique_ptr~Tower~~
-        -enemies_ : vector~unique_ptr~Enemy~~
+        -enemies_ : vector~shared_ptr~Enemy~~
         -projectiles_ : vector~unique_ptr~Projectile~~
     }</code></pre>
+<p>Enemies are <code>shared_ptr</code> so that <code>Projectile</code> can follow its target with a
+<code>weak_ptr</code> and notice when it died.</p>
+<hr />
+<h2 id="enemyfactory">EnemyFactory<a class="headerlink" href="#enemyfactory" title="Permanent link">&para;</a></h2>
+<p>Creates enemies at random, following <strong>probability matrices that depend on the
+map's biome</strong>. The species and the element are drawn independently:</p>
+<p><code>P(type, element | biome) = P(type | biome) × P(element | biome)</code></p>
+<pre class="mermaid"><code>classDiagram
+    class EnemyFactory {
+        +EnemyFactory(biome: Biome, seed: uint32, table: SpawnTable)
+        +roll(rank: Rank) EnemySpec
+        +create(id: EntityId, path: span~Vector2f~) unique_ptr~Enemy~
+        +create(id: EntityId, spec: EnemySpec, path: span~Vector2f~, generation: int)$ unique_ptr~Enemy~
+        +probability(element: Element) double
+        +probability(type: EnemyType) double
+        -weights_ : SpawnWeights
+        -rng_ : mt19937
+    }
+
+    class EnemySpec {
+        +type : EnemyType
+        +element : Element
+        +rank : Rank
+    }
+
+    class SpawnWeights {
+        +elements : array~double, ELEMENT_COUNT~
+        +types : array~double, ENEMY_TYPE_COUNT~
+    }
+
+    EnemyFactory --&gt; SpawnWeights : one row per biome
+    EnemyFactory ..&gt; EnemySpec : rolls
+    WaveManager --&gt; EnemyFactory : builds waves</code></pre>
+<p>Default matrices (<code>src/entities/EnemyFactory.cpp</code>, in %):</p>
+<table>
+<thead>
+<tr>
+<th>Biome</th>
+<th style="text-align: right;">Water</th>
+<th style="text-align: right;">Fire</th>
+<th style="text-align: right;">Earth</th>
+<th style="text-align: right;">Wind</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Desert</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">35</td>
+<td style="text-align: right;">35</td>
+<td style="text-align: right;">20</td>
+</tr>
+<tr>
+<td>Ice</td>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">35</td>
+</tr>
+<tr>
+<td>Volcano</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">35</td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td>Forest</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">25</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Biome</th>
+<th style="text-align: right;">Octopus</th>
+<th style="text-align: right;">Orangutan</th>
+<th style="text-align: right;">Cat</th>
+<th style="text-align: right;">Dog</th>
+<th style="text-align: right;">Duck</th>
+<th style="text-align: right;">Frog</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Desert</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td>Ice</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td>Volcano</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr>
+<td>Forest</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">15</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Never 0%</p>
+<p>Every weight must be &gt; 0. A <code>static_assert</code> rejects the default table at
+compile time otherwise, and the constructor throws <code>std::invalid_argument</code>
+for a custom table. Adding an element (ice, magma, lightning...) leaves a
+0 in every row until its column is filled, so it cannot be forgotten.</p>
+</div>
+<hr />
+<h2 id="enemy-definitions-stats-hooks">Enemy definitions (stats + hooks)<a class="headerlink" href="#enemy-definitions-stats-hooks" title="Permanent link">&para;</a></h2>
+<p>An enemy is <strong>species + element + rank</strong>. All three are defined in C++, in
+<code>src/entities/EnemyDefinitions.cpp</code>, and each one brings stats <strong>and functions</strong>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>final stat = base(species) × mult(element) × mult(rank) + add(element) + add(rank)
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Struct</th>
+<th>Gives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Species</td>
+<td><code>SpeciesDefinition</code></td>
+<td>base stats (<code>baseStats(hp, speed, gold, damage)</code>) + hooks</td>
+</tr>
+<tr>
+<td>Element</td>
+<td><code>ModifierDefinition</code></td>
+<td>multipliers (<code>times</code>) + bonuses (<code>plus</code>) + hooks</td>
+</tr>
+<tr>
+<td>Rank</td>
+<td><code>ModifierDefinition</code></td>
+<td>multipliers (<code>times</code>) + bonuses (<code>plus</code>) + hooks</td>
+</tr>
+</tbody>
+</table>
+<p>Stats (<code>Stats.hpp</code>): <code>Health</code>, <code>Speed</code>, <code>Reward</code>, <code>Damage</code>, <code>Scale</code>.</p>
+<h3 id="hooks">Hooks<a class="headerlink" href="#hooks" title="Permanent link">&para;</a></h3>
+<p><code>EnemyHooks</code> holds optional <code>std::function</code>s. The hooks of the three layers all
+run, species first, then element, then rank:</p>
+<table>
+<thead>
+<tr>
+<th>Hook</th>
+<th>Signature</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>onSpawn</code></td>
+<td><code>void(Enemy&amp;)</code></td>
+<td>once, at creation</td>
+</tr>
+<tr>
+<td><code>onUpdate</code></td>
+<td><code>void(Enemy&amp;, float dt)</code></td>
+<td>every frame while alive</td>
+</tr>
+<tr>
+<td><code>onHit</code></td>
+<td><code>float(Enemy&amp;, float damage)</code></td>
+<td>before damage, returns the damage taken (chained)</td>
+</tr>
+<tr>
+<td><code>onDeath</code></td>
+<td><code>void(Enemy&amp;, EnemySpawner&amp;)</code></td>
+<td>killed by damage</td>
+</tr>
+<tr>
+<td><code>onReachBase</code></td>
+<td><code>void(Enemy&amp;)</code></td>
+<td>reaches the base</td>
+</tr>
+</tbody>
+</table>
+<p>A hook can change the enemy (<code>enemy.stats()[Stat::Speed] *= 1.3f</code>, <code>enemy.heal(5)</code>),
+and remember things in <code>enemy.memory(0..3)</code>. Ready-made hooks: <code>armor(n)</code>,
+<code>regeneration(hpPerSecond)</code>, <code>splitInto(count, rank)</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{.</span><span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Dog: runs 30% faster once below half health."</span><span class="p">,</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w"> </span><span class="p">.</span><span class="n">base</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">baseStats</span><span class="p">(</span><span class="mf">80.f</span><span class="p">,</span><span class="w"> </span><span class="mf">125.f</span><span class="p">,</span><span class="w"> </span><span class="mf">8.f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.f</span><span class="p">),</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w"> </span><span class="p">.</span><span class="n">hooks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">onUpdate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="n">Enemy</span><span class="o">&amp;</span><span class="w"> </span><span class="n">dog</span><span class="p">,</span><span class="w"> </span><span class="kt">float</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">     </span><span class="kt">float</span><span class="o">&amp;</span><span class="w"> </span><span class="n">enraged</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dog</span><span class="p">.</span><span class="n">memory</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">     </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">enraged</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mf">0.f</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">dog</span><span class="p">.</span><span class="n">health</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">dog</span><span class="p">.</span><span class="n">maxHealth</span><span class="p">()</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">0.5f</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">         </span><span class="n">enraged</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.f</span><span class="p">;</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">         </span><span class="n">dog</span><span class="p">.</span><span class="n">stats</span><span class="p">()[</span><span class="n">Stat</span><span class="o">::</span><span class="n">Speed</span><span class="p">]</span><span class="w"> </span><span class="o">*=</span><span class="w"> </span><span class="mf">1.3f</span><span class="p">;</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">     </span><span class="p">}</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w"> </span><span class="p">}}},</span>
+</code></pre></div>
+<h3 id="current-definitions">Current definitions<a class="headerlink" href="#current-definitions" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Orangutan</td>
+<td>slow tank, armor 2</td>
+</tr>
+<tr>
+<td>Cat</td>
+<td>fast, survives its first deadly hit with 1 hp</td>
+</tr>
+<tr>
+<td>Dog</td>
+<td>+30% speed below half health</td>
+</tr>
+<tr>
+<td>Water</td>
+<td>+5 gold, regenerates 2 hp/s</td>
+</tr>
+<tr>
+<td>Fire</td>
+<td>×1.15 speed, ×0.9 health</td>
+</tr>
+<tr>
+<td>Earth</td>
+<td>×1.3 health, ×0.85 speed, armor 2</td>
+</tr>
+<tr>
+<td>Wind</td>
+<td>×1.3 speed, ×0.8 health</td>
+</tr>
+<tr>
+<td>Mini-boss</td>
+<td>×4 health, ×3 gold/damage, ×0.9 speed, size ×1.4</td>
+</tr>
+<tr>
+<td>Boss</td>
+<td>×12 health, ×10 gold, ×5 damage, ×0.75 speed, armor 3, size ×1.9</td>
+</tr>
+<tr>
+<td>Super boss</td>
+<td>×25 health, ×20 gold, ×10 damage, ×0.6 speed, armor 5, size ×2.4, splits into 3 mini-bosses</td>
+</tr>
+</tbody>
+</table>
+<p>Armor removes <code>n</code> from each hit but always lets 20% through; armor hooks stack.</p>
+<h3 id="super-boss-split">Super boss split<a class="headerlink" href="#super-boss-split" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant E as Enemy (super boss)
+    participant B as EventBus
+    participant W as WaveManager (EnemySpawner)
+    participant M as EntityManager
+    E-&gt;&gt;B: EnemyKilled{enemy, reward}
+    B-&gt;&gt;W: handler
+    W-&gt;&gt;E: runDeathHooks(*this)
+    E-&gt;&gt;W: splitInto → rollSpec() ×3, spawnChild(parent, spec)
+    Note over W: queued (we may be inside updateAll)
+    W-&gt;&gt;M: next update(): spawnEnemy(child), placed behind the parent</code></pre>
+<p>Children keep the element, roll their species with the biome matrices, and get
+<code>generation + 1</code>; splitting stops at <code>MAX_SPAWN_GENERATION</code> (3). A wave is not
+complete while children are waiting to spawn.</p>
+<h3 id="wave-composition">Wave composition<a class="headerlink" href="#wave-composition" title="Permanent link">&para;</a></h3>
+<p><code>WAVE_RULES</code> (<code>EnemyDefinitions.hpp</code>): 30 enemies in wave 1, +5 per wave, every
+10th enemy is a mini-boss, the last one is a super boss, 0.7 s between spawns.</p>
 <hr />
 <h2 id="wavemanager">WaveManager<a class="headerlink" href="#wavemanager" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>classDiagram
@@ -968,7 +1403,10 @@
         +startNextWave()
         +isWaveComplete() bool
         +getCurrentWave() int
+        +rollSpec() EnemySpec
+        +spawnChild(parent: Enemy, spec: EnemySpec)
         -waves_ : vector~WaveData~
+        -pendingChildren_ : vector~PendingChild~
         -spawnTimer_ : float
         -entityManager_ : EntityManager&amp;
     }
@@ -979,13 +1417,14 @@
     }
 
     class SpawnEntry {
-        +type : EnemyType
+        +spec : EnemySpec
         +count : int
         +delay : float
     }
 
     WaveManager --&gt; WaveData
-    WaveData --&gt; SpawnEntry</code></pre>
+    WaveData --&gt; SpawnEntry
+    EnemySpawner &lt;|-- WaveManager</code></pre>
 <hr />
 <h2 id="eventbus-decoupling">EventBus (Decoupling)<a class="headerlink" href="#eventbus-decoupling" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>classDiagram
@@ -1042,29 +1481,39 @@
     end</code></pre>
 <hr />
 <h2 id="file-structure">File Structure<a class="headerlink" href="#file-structure" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>src/
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── core/
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   ├── Game.hpp / Game.cpp
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── StateMachine.hpp          ← std::variant&lt;MenuState, PlayState, ...&gt;
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   └── EventBus.hpp              ← template header-only
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>├── states/
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│   ├── MenuState.hpp / .cpp
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│   ├── PlayState.hpp / .cpp
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│   ├── PauseState.hpp / .cpp
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│   └── GameOverState.hpp / .cpp
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>├── entities/
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│   ├── Entity.hpp                ← abstract base
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│   ├── Tower.hpp / .cpp
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│   ├── Enemy.hpp / .cpp
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   └── Projectile.hpp / .cpp
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>├── managers/
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│   ├── EntityManager.hpp / .cpp
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│   ├── WaveManager.hpp / .cpp
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│   └── ResourceManager.hpp / .cpp
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>├── map/
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│   ├── Map.hpp / .cpp
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│   └── Tile.hpp
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>└── defender_lib.cpp              ← CMake stub
+<p>Headers live in <code>include/defender/&lt;folder&gt;/</code>, sources in <code>src/&lt;folder&gt;/</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>src/
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── core/
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│   ├── Game.hpp / Game.cpp
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│   ├── StateMachine.hpp          ← std::variant&lt;MenuState, PlayState, ...&gt;
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│   ├── EventBus.hpp              ← template header-only
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│   ├── Events.hpp                ← EnemyKilled, WaveStarted...
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│   └── Concepts.hpp              ← Updatable, Renderable, Damageable
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>├── states/
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>│   ├── MenuState.hpp / .cpp
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>│   ├── PlayState.hpp / .cpp
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>│   ├── PauseState.hpp / .cpp
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>│   └── GameOverState.hpp / .cpp
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>├── entities/
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>│   ├── Types.hpp                 ← Element, EnemyType, Rank, EnemySpec
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>│   ├── Stats.hpp                 ← Stat, EnemyStats
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>│   ├── EnemyDefinitions.hpp / .cpp ← species/element/rank stats + hooks, wave rules
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>│   ├── Entity.hpp                ← abstract base
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>│   ├── Tower.hpp / .cpp
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>│   ├── Enemy.hpp / .cpp
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>│   ├── EnemyFactory.hpp / .cpp   ← biome probability matrices
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>│   └── Projectile.hpp / .cpp
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>├── managers/
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>│   ├── EntityManager.hpp / .cpp
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>│   ├── WaveManager.hpp / .cpp
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>│   └── ResourceManager.hpp / .cpp
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>├── map/
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>│   ├── Tile.hpp                  ← TileType, Biome, GridPos
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>│   ├── Map.hpp / .cpp
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>│   ├── Maze.hpp / .cpp           ← perfect maze (recursive backtracker)
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>│   ├── MapGenerator.hpp / .cpp
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>│   └── MapRenderer.hpp / .cpp
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>└── defender_lib.cpp              ← CMake stub
 </code></pre></div>
 
 
@@ -1137,10 +1586,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>
