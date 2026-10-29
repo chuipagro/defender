@@ -267,15 +267,18 @@ and remember things in `enemy.memory(0..3)`. Ready-made hooks: `armor(n)`,
 | Orangutan  | slow tank, armor 2 |
 | Cat        | fast, survives its first deadly hit with 1 hp |
 | Dog        | +30% speed below half health |
-| Water      | +5 gold, regenerates 2 hp/s |
-| Fire       | ×1.15 speed, ×0.9 health |
-| Earth      | ×1.3 health, ×0.85 speed, armor 2 |
-| Wind       | ×1.3 speed, ×0.8 health |
+| Normal     | natural colors, base stats |
+| Water      | ×1.5 health/gold/damage, +5 gold, leaves a normal enemy behind when killed |
+| Fire       | ×1.4 health/gold/damage, ×1.2 speed, rises from its ashes once (40% health) |
+| Earth      | ×1.5 health/gold/damage, ×0.85 speed, armor 3 |
+| Wind       | ×1.3 health/gold/damage, ×1.35 speed, dodges one hit out of 5 |
 | Mini-boss  | ×4 health, ×3 gold/damage, ×0.9 speed, size ×1.4 |
 | Boss       | ×12 health, ×10 gold, ×5 damage, ×0.75 speed, armor 3, size ×1.9 |
 | Super boss | ×25 health, ×20 gold, ×10 damage, ×0.6 speed, armor 5, size ×2.4, splits into 3 mini-bosses |
 
 Armor removes `n` from each hit but always lets 20% through; armor hooks stack.
+Each layer has its own memory slot (`Enemy::MEMORY_SPECIES`, `MEMORY_ELEMENT`,
+`MEMORY_RANK`) so their hooks never overwrite each other.
 
 ### Super boss split
 
@@ -297,10 +300,91 @@ Children keep the element, roll their species with the biome matrices, and get
 `generation + 1`; splitting stops at `MAX_SPAWN_GENERATION` (3). A wave is not
 complete while children are waiting to spawn.
 
-### Wave composition
+---
 
-`WAVE_RULES` (`EnemyDefinitions.hpp`): 30 enemies in wave 1, +5 per wave, every
-10th enemy is a mini-boss, the last one is a super boss, 0.7 s between spawns.
+## LevelManager (difficulty)
+
+A level is 150 waves played one after the other:
+`Break (8 s, N / play button to skip) → Running → WaveCompleted → Break → ...`
+until wave 150 is cleared (`Phase::Victory`).
+
+Each wave gets a `WavePlan` from `planForWave(wave)`, built from curves of
+`{wave, value}` points (linear in between) at the top of `LevelManager.cpp`:
+
+| Wave | Enemies | Mini-boss | Boss | Super boss | Elemental factor |
+|-----:|--------:|----------:|-----:|-----------:|-----------------:|
+|    1 |       5 |         – |    – |          – |             0.2 |
+|   10 |      12 |        3% |    – |          – |             0.3 |
+|   25 |      30 |      4.9% |   1% |          – |            0.45 |
+|   50 |      75 |        8% |   2% |       0.5% |             0.8 |
+|  100 |     200 |       15% |   5% |         2% |             1.5 |
+|  150 |     200 |       25% |  10% |         5% |               3 |
+
+- A rank always shows up at least once on its unlock wave (10, 25, 50).
+- Counts per rank are `count × share`, rounded at random; the strongest enemy closes the wave.
+- The elemental factor multiplies the weight of every element but Normal in the
+  biome matrix (1 = half of the enemies are elemental).
+- Cleared wave: `20 + 5 × wave` gold, 1 skill point (3 every 10th wave).
+
+---
+
+## Towers
+
+Defined in C++ in `src/entities/TowerDefinitions.cpp` (`TowerDefinition`: price,
+damage, range, fire rate, projectile sprite, splash, upgrade costs, `onHit` effect).
+
+| Tower  | Gold | Projectile | Effect | Upgrades (level 2 / 3) |
+|--------|-----:|------------|--------|------------------------|
+| Normal |   50 | arrow      | fast shots | 60 / 120 gold |
+| Water  |   80 | bubble     | slows to 60% speed for 1.5 s | 90 g + 3 / 180 g + 8 water drops |
+| Fire   |   90 | fireball   | burns 6 hp/s for 3 s (ignores armor) | 100 g + 3 / 200 g + 8 embers |
+| Earth  |  100 | rock       | splash damage (40 px) | 110 g + 3 / 220 g + 8 stones |
+| Wind   |   85 | gust       | pushes back 20 px (less for big enemies) | 95 g + 3 / 190 g + 8 feathers |
+
+Each level: damage +50%, range +10%, fire rate +15%, effects +25%. Skill tree
+bonuses (`TowerUpgrades`) multiply on top. Selling gives back 60% of the gold spent.
+
+Shooting (`EntityManager::updateAll`): enemies move, each ready tower picks the
+alive enemy in range with the highest `progress()` (furthest along the path) and
+fires a `Projectile` carrying a `Shot`. Projectiles home in on their target; on
+arrival `resolveImpact` applies the damage (target or splash) and the tower's `onHit`.
+
+**Materials**: elemental enemies drop materials of their element when killed
+(`materialDrop`: 35% chance of 1 for a normal rank, 2 / 5 / 10 for mini-boss /
+boss / super boss). They fly to their counter in the build bar.
+
+---
+
+## Player
+
+Gold (enemy rewards + end-of-wave bonus), elemental materials, health (50), shield (0 until unlocked,
+absorbs damage first, refilled at the end of each wave), skill points.
+
+## Skill tree
+
+Nodes are defined in C++ in `src/skills/SkillDefinitions.cpp`: cost in skill
+points, prerequisites, position in the menu, icon or tower sprite, and an
+`effect(Player&, TowerUpgrades&)` run once when bought.
+
+- **Towers**: normal tower (owned from the start) → water, fire, earth, wind towers,
+  each with *Puissance* (+25% damage) and *Cadence* (+20% fire rate).
+- **Base**: max health, shield, reinforced shield, +25% wave gold.
+
+`TowerUpgrades` (unlocked towers + damage/range/fire-rate multipliers) is what
+the tower system will read.
+
+## UI
+
+- `ui/Ui.hpp`: pixel font (`sprites/ui/font.png`, ASCII + é è ê à â ç ù û ô î),
+  icons (`sprites/ui/icons.png`, `enum class Icon`), panels, lines.
+- `Hud`: top bar (health, shield, gold, points, wave, enemies left, next-wave /
+  speed / skill-tree buttons).
+- `SkillTreeMenu`: full-screen tree (T or the tree button), pauses the game.
+- `BuildBar`: bottom bar, tower buttons (keys 1-5) and material counters.
+- `TowerPanel`: next to the selected tower: level, stats, upgrade (U) and sell.
+
+Controls: 1-5 / build bar = choose a tower, left click on a slab = place (stays in
+build mode), right click / Escape = cancel, click a tower = select it.
 
 ---
 
@@ -310,8 +394,9 @@ complete while children are waiting to spawn.
 classDiagram
     class WaveManager {
         +update(dt: float)
-        +startNextWave()
         +isWaveComplete() bool
+        +startWave(number: int, data: WaveData)
+        +remainingEnemies() int
         +getCurrentWave() int
         +rollSpec() EnemySpec
         +spawnChild(parent: Enemy, spec: EnemySpec)
@@ -417,6 +502,7 @@ src/
 ├── core/
 │   ├── Game.hpp / Game.cpp
 │   ├── StateMachine.hpp          ← std::variant<MenuState, PlayState, ...>
+│   ├── Player.hpp / .cpp         ← gold, health, shield, skill points
 │   ├── EventBus.hpp              ← template header-only
 │   ├── Events.hpp                ← EnemyKilled, WaveStarted...
 │   └── Concepts.hpp              ← Updatable, Renderable, Damageable
@@ -428,7 +514,8 @@ src/
 ├── entities/
 │   ├── Types.hpp                 ← Element, EnemyType, Rank, EnemySpec
 │   ├── Stats.hpp                 ← Stat, EnemyStats
-│   ├── EnemyDefinitions.hpp / .cpp ← species/element/rank stats + hooks, wave rules
+│   ├── EnemyDefinitions.hpp / .cpp ← species/element/rank stats + hooks, loot
+│   ├── TowerDefinitions.hpp / .cpp ← tower stats, levels, costs, effects
 │   ├── Entity.hpp                ← abstract base
 │   ├── Tower.hpp / .cpp
 │   ├── Enemy.hpp / .cpp
@@ -436,8 +523,19 @@ src/
 │   └── Projectile.hpp / .cpp
 ├── managers/
 │   ├── EntityManager.hpp / .cpp
+│   ├── LevelManager.hpp / .cpp   ← 150 waves, difficulty curves
 │   ├── WaveManager.hpp / .cpp
 │   └── ResourceManager.hpp / .cpp
+├── skills/
+│   ├── SkillTree.hpp / .cpp      ← TowerUpgrades, SkillNode, SkillTree
+│   └── SkillDefinitions.cpp      ← the nodes of the tree
+├── ui/
+│   ├── Icon.hpp                  ← enum of icons.png
+│   ├── Ui.hpp / .cpp             ← pixel font, icons, panels
+│   ├── Hud.hpp / .cpp
+│   ├── BuildBar.hpp / .cpp
+│   ├── TowerPanel.hpp / .cpp
+│   └── SkillTreeMenu.hpp / .cpp
 ├── map/
 │   ├── Tile.hpp                  ← TileType, Biome, GridPos
 │   ├── Map.hpp / .cpp

@@ -3,14 +3,14 @@
 #include "defender/core/Events.hpp"
 
 #include <algorithm>
+#include <utility>
 
 namespace defender
 {
 
 WaveManager::WaveManager(EntityManager& entityManager, EnemyFactory& factory,
-                         std::span<const sf::Vector2f> path, const WaveRules& rules)
-    : rules_(rules),
-      entityManager_(entityManager),
+                         std::span<const sf::Vector2f> path)
+    : entityManager_(entityManager),
       factory_(factory),
       path_(path),
       killedHandler_(EventBus::instance().subscribe<EnemyKilled>(
@@ -31,20 +31,20 @@ WaveManager::~WaveManager()
     EventBus::instance().unsubscribe(killedHandler_);
 }
 
-int WaveManager::enemiesInWave(int wave) const
+void WaveManager::startWave(int number, WaveData data)
 {
-    return rules_.firstWaveSize + ((wave - 1) * rules_.growthPerWave);
-}
-
-void WaveManager::startNextWave()
-{
-    ++currentWave_;
-    total_ = enemiesInWave(currentWave_);
+    currentWave_ = number;
+    total_ = 0;
+    for (const SpawnEntry& entry : data.enemies)
+    {
+        total_ += entry.count;
+    }
     spawned_ = 0;
     nextEntry_ = 0;
     spawnedInEntry_ = 0;
-    waves_.push_back(buildWave(total_));
-    spawnTimer_ = rules_.firstSpawnDelay;
+    spawnTimer_ = data.enemies.empty() ? 0.f : data.enemies.front().delay;
+    waves_.clear();
+    waves_.push_back(std::move(data));
     EventBus::instance().emit(WaveStarted{currentWave_});
 }
 
@@ -120,15 +120,13 @@ bool WaveManager::isWaveComplete() const
            std::none_of(enemies.begin(), enemies.end(), [](const auto& e) { return e->isAlive(); });
 }
 
-WaveData WaveManager::buildWave(int count)
+int WaveManager::remainingEnemies() const
 {
-    WaveData wave;
-    wave.spawnInterval = rules_.spawnInterval;
-    for (int i = 0; i < count; ++i)
-    {
-        wave.enemies.push_back({factory_.roll(rankInWave(i, count, rules_)), 1, 0.f});
-    }
-    return wave;
+    const auto enemies = entityManager_.enemies();
+    const auto alive = std::count_if(enemies.begin(), enemies.end(),
+                                     [](const auto& e) { return e->isAlive(); });
+    return (total_ - spawned_) + static_cast<int>(alive) +
+           static_cast<int>(pendingChildren_.size());
 }
 
 }  // namespace defender

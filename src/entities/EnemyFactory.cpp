@@ -1,5 +1,6 @@
 #include "defender/entities/EnemyFactory.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
@@ -13,15 +14,17 @@ namespace
 
 // ── Probability matrices ──────────────────────────────────────────────────────
 //
-// Relative weights per biome (a row sums to 100 to read as percentages).
+// Relative weights per biome. Elements sum to 100 and Normal is worth 100 too,
+// so with the default elemental factor (1) half of the enemies are elemental.
+// LevelManager raises the elemental factor with the waves.
 // Every weight must stay > 0: the static_assert below enforces it.
 
 constexpr SpawnTable DEFAULT_SPAWN_TABLE = {{
-    //            Water  Fire  Earth  Wind        Octopus Orangutan Cat Dog Duck Frog
-    /* Desert  */ {{10, 35, 35, 20},             {5, 20, 30, 30, 5, 10}},
-    /* Ice     */ {{45, 5, 15, 35},              {20, 10, 15, 20, 25, 10}},
-    /* Volcano */ {{5, 50, 35, 10},              {10, 25, 25, 20, 10, 10}},
-    /* Forest  */ {{25, 10, 40, 25},             {10, 30, 15, 15, 15, 15}},
+    //            Normal Water Fire Earth Wind     Octopus Orangutan Cat Dog Duck Frog
+    /* Desert  */ {{100, 10, 35, 35, 20},          {5, 20, 30, 30, 5, 10}},
+    /* Ice     */ {{100, 45, 5, 15, 35},           {20, 10, 15, 20, 25, 10}},
+    /* Volcano */ {{100, 5, 50, 35, 10},           {10, 25, 25, 20, 10, 10}},
+    /* Forest  */ {{100, 25, 10, 40, 25},          {10, 30, 15, 15, 15, 15}},
 }};
 
 constexpr bool allPositive(const SpawnTable& table)
@@ -92,10 +95,27 @@ EnemyFactory::EnemyFactory(Biome biome, std::uint32_t seed, const SpawnTable& ta
     typeDistribution_ = {weights_.types.begin(), weights_.types.end()};
 }
 
-EnemySpec EnemyFactory::roll(Rank rank)
+EnemySpec EnemyFactory::roll(Rank rank, double elementalFactor)
 {
     const auto type = static_cast<EnemyType>(typeDistribution_(rng_));
-    const auto element = static_cast<Element>(elementDistribution_(rng_));
+    Element element{};
+    if (elementalFactor == 1.0)
+    {
+        element = static_cast<Element>(elementDistribution_(rng_));
+    }
+    else
+    {
+        std::array<double, ELEMENT_COUNT> weights = weights_.elements;
+        for (std::size_t i = 0; i < weights.size(); ++i)
+        {
+            if (static_cast<Element>(i) != Element::Normal)
+            {
+                weights[i] *= std::max(elementalFactor, 1e-6);  // never 0%
+            }
+        }
+        std::discrete_distribution<std::size_t> distribution(weights.begin(), weights.end());
+        element = static_cast<Element>(distribution(rng_));
+    }
     return {type, element, rank};
 }
 

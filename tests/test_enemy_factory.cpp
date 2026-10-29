@@ -19,8 +19,8 @@ namespace
 {
 
 constexpr std::array<Biome, 4> BIOMES{Biome::Desert, Biome::Ice, Biome::Volcano, Biome::Forest};
-constexpr std::array<Element, 4> ELEMENTS{Element::Water, Element::Fire, Element::Earth,
-                                         Element::Wind};
+constexpr std::array<Element, 5> ELEMENTS{Element::Normal, Element::Water, Element::Fire,
+                                         Element::Earth, Element::Wind};
 constexpr std::array<EnemyType, 6> TYPES{EnemyType::Octopus, EnemyType::Orangutan, EnemyType::Cat,
                                         EnemyType::Dog,     EnemyType::Duck,      EnemyType::Frog};
 
@@ -83,7 +83,7 @@ TEST(EnemyFactory, RollsFollowTheMatrix)
     for (const Biome biome : BIOMES)
     {
         EnemyFactory factory(biome, 42);
-        std::array<int, 4> elementCounts{};
+        std::array<int, 5> elementCounts{};
         std::array<int, 6> typeCounts{};
         const int rolls = 20000;
         for (int i = 0; i < rolls; ++i)
@@ -117,6 +117,23 @@ TEST(EnemyFactory, RareElementsStillSpawn)
     EXPECT_GT(fire, 0);
 }
 
+TEST(EnemyFactory, ElementalFactorChangesTheShare)
+{
+    auto elementalShare = [](double factor)
+    {
+        EnemyFactory factory(Biome::Forest, 11);
+        int elemental = 0;
+        for (int i = 0; i < 4000; ++i)
+        {
+            elemental += factory.roll(defender::Rank::Normal, factor).element != Element::Normal;
+        }
+        return elemental / 4000.0;
+    };
+    EXPECT_NEAR(elementalShare(1.0), 0.5, 0.03);
+    EXPECT_NEAR(elementalShare(0.25), 0.2, 0.03);  // 25 / (100 + 25)
+    EXPECT_NEAR(elementalShare(3.0), 0.75, 0.03);
+}
+
 TEST(EnemyFactory, SameSeedSameEnemies)
 {
     EnemyFactory a(Biome::Forest, 123);
@@ -139,9 +156,9 @@ TEST(EnemyFactory, AcceptsACustomTable)
 {
     defender::SpawnTable table = defender::defaultSpawnTable();
     auto& desert = table[static_cast<std::size_t>(Biome::Desert)];
-    desert.elements = {1, 1, 1, 97};
+    desert.elements = {1, 1, 1, 1, 96};
     const EnemyFactory factory(Biome::Desert, 0, table);
-    EXPECT_NEAR(factory.probability(Element::Wind), 0.97, 1e-9);
+    EXPECT_NEAR(factory.probability(Element::Wind), 0.96, 1e-9);
 }
 
 // ── Enemy creation ───────────────────────────────────────────────────────────
@@ -202,7 +219,7 @@ TEST(Skeleton, WaveManagerStartsWaves)
     defender::EntityManager manager;
     EnemyFactory factory(Biome::Forest, 1);
     defender::WaveManager waves(manager, factory, path);
-    waves.startNextWave();
+    waves.startWave(1, defender::WaveData{});
     EXPECT_EQ(waves.getCurrentWave(), 1);
 }
 

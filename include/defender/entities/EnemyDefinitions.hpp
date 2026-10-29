@@ -92,24 +92,13 @@ struct ModifierDefinition
 /// (biome matrices), unless the enemy is already at MAX_SPAWN_GENERATION.
 [[nodiscard]] std::function<void(Enemy&, EnemySpawner&)> splitInto(int count, Rank rank);
 
+// ── Loot ──────────────────────────────────────────────────────────────────────
+
+/// Materials of its element dropped by a killed enemy. `roll` is a random
+/// number in [0, 1). Normal enemies drop nothing.
+[[nodiscard]] int materialDrop(EnemySpec spec, float roll);
+
 /// Children of children... stop splitting at this depth.
 inline constexpr int MAX_SPAWN_GENERATION = 3;
-
-// ── Waves ─────────────────────────────────────────────────────────────────────
-
-struct WaveRules
-{
-    int firstWaveSize = 30;
-    int growthPerWave = 5;     ///< Extra enemies per wave
-    int miniBossEvery = 10;    ///< Every N-th enemy is a mini-boss (0 = never)
-    Rank lastEnemy = Rank::SuperBoss;  ///< Rank of the last enemy of a wave
-    float firstSpawnDelay = 1.f;  ///< Seconds before the first enemy
-    float spawnInterval = 0.7f;   ///< Seconds between two enemies
-};
-
-inline constexpr WaveRules WAVE_RULES{};
-
-/// Rank of the `index`-th enemy (0-based) of a wave of `size` enemies.
-[[nodiscard]] Rank rankInWave(int index, int size, const WaveRules& rules = WAVE_RULES);
 
 }  // namespace defender

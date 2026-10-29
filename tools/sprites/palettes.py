@@ -17,6 +17,9 @@ Fixed keys (same for every element) are in FIXED below.
 
 To add an element (magma, ice, lightning...), add an entry to
 ELEMENTS and run `make sprites`.
+
+The "normal" element has no single palette: each animal keeps its natural
+colors (NATURAL below), and the normal tower uses NATURAL["tower"].
 """
 
 ELEMENTS = {
@@ -58,6 +61,38 @@ ELEMENTS = {
     },
 }
 
+# Natural colors of each animal for the "normal" (non-elemental) enemies.
+NATURAL = {
+    "octopus": {   # coral pink, cream suckers
+        "O": "#4a1530", "1": "#a8325e", "2": "#e0577f", "3": "#f58fa8", "4": "#ffd0dc",
+        "a": "#ffe0a0", "b": "#fff3d0",
+    },
+    "orangutan": {  # rusty orange fur
+        "O": "#3a1606", "1": "#8a3a10", "2": "#c25a1c", "3": "#e07f34", "4": "#f5ad66",
+        "a": "#6b3a1a", "b": "#a0602e",
+    },
+    "cat": {       # ginger tabby, white muzzle
+        "O": "#3a2010", "1": "#b8601e", "2": "#e8892e", "3": "#f5b062", "4": "#fff0dc",
+        "a": "#e88aa0", "b": "#ffc0d0",
+    },
+    "dog": {       # shiba beige
+        "O": "#33200f", "1": "#8a5a2e", "2": "#c08a52", "3": "#e0b480", "4": "#fff4e2",
+        "a": "#6b4a2e", "b": "#a07a50",
+    },
+    "duck": {      # yellow duckling, orange beak and feet
+        "O": "#5a3a08", "1": "#d9a21a", "2": "#f5cc3a", "3": "#ffe476", "4": "#fff7c4",
+        "a": "#e8701a", "b": "#ffa040",
+    },
+    "frog": {      # leaf green, pale belly
+        "O": "#12361a", "1": "#2f7a2e", "2": "#4fae3e", "3": "#8ad660", "4": "#e0f5b0",
+        "a": "#e8a02a", "b": "#ffd060",
+    },
+    "tower": {     # wood and steel
+        "O": "#2a1c12", "1": "#5e3f24", "2": "#8a6038", "3": "#b08452", "4": "#d8b280",
+        "a": "#8a909c", "b": "#e6e9ef",
+    },
+}
+
 FIXED = {
     ".": None,          # transparent
     "w": "#ffffff",     # eye white
@@ -82,11 +117,19 @@ def hex_to_rgba(value):
     return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16), 255)
 
 
-def resolve(element):
-    """Full key -> RGBA table for one element."""
+def resolve(element, subject="tower"):
+    """Full key -> RGBA table for one element.
+
+    For "normal", `subject` (an animal name or "tower") picks the natural colors.
+    """
+    colors = NATURAL[subject] if element == "normal" else ELEMENTS[element]
     table = {k: hex_to_rgba(v) for k, v in FIXED.items()}
-    table.update({k: hex_to_rgba(v) for k, v in ELEMENTS[element].items()})
+    table.update({k: hex_to_rgba(v) for k, v in colors.items()})
     return table
+
+
+# Every enemy/tower variant: "normal" first, then the elements.
+ALL_ELEMENTS = ["normal"] + list(ELEMENTS)
 
 
 # ── Map biomes ────────────────────────────────────────────────────────────────

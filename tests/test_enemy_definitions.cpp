@@ -26,22 +26,45 @@ const std::vector<sf::Vector2f> LONG_PATH{{0.f, 0.f}, {1000.f, 0.f}, {1000.f, 10
 
 // ── Stats composition ─────────────────────────────────────────────────────────
 
-TEST(EnemyStats, WaterGivesFiveMoreGold)
+TEST(EnemyStats, NormalHasTheSpeciesStats)
 {
-    const auto dogFire = computeStats({EnemyType::Dog, Element::Fire});
-    const auto dogWater = computeStats({EnemyType::Dog, Element::Water});
     const auto base = defender::speciesDefinition(EnemyType::Dog).base;
-    EXPECT_EQ(dogFire.reward(), base.reward());
-    EXPECT_EQ(dogWater.reward(), base.reward() + 5);
+    const auto dog = computeStats({EnemyType::Dog, Element::Normal});
+    EXPECT_EQ(dog.values, base.values);
+}
+
+TEST(EnemyStats, WaterIsOneAndAHalfTimesStrongerPlusFiveGold)
+{
+    const auto base = defender::speciesDefinition(EnemyType::Dog).base;
+    const auto dog = computeStats({EnemyType::Dog, Element::Water});
+    EXPECT_FLOAT_EQ(dog.health(), base.health() * 1.5f);
+    EXPECT_FLOAT_EQ(dog.damage(), base.damage() * 1.5f);
+    EXPECT_FLOAT_EQ(dog.get(Stat::Reward), (base.get(Stat::Reward) * 1.5f) + 5.f);
+    EXPECT_FLOAT_EQ(dog.speed(), base.speed());
+}
+
+TEST(EnemyStats, EveryElementIsStrongerThanNormal)
+{
+    for (const EnemyType type : {EnemyType::Octopus, EnemyType::Orangutan, EnemyType::Cat,
+                                 EnemyType::Dog, EnemyType::Duck, EnemyType::Frog})
+    {
+        const auto normal = computeStats({type, Element::Normal});
+        for (const Element element : {Element::Water, Element::Fire, Element::Earth, Element::Wind})
+        {
+            const auto stats = computeStats({type, element});
+            EXPECT_GT(stats.health(), normal.health()) << defender::elementName(element);
+            EXPECT_GT(stats.reward(), normal.reward()) << defender::elementName(element);
+        }
+    }
 }
 
 TEST(EnemyStats, SpeciesAndElementCombine)
 {
-    // Wind = x1.3 speed, x0.8 health on top of the cat's stats.
+    // Wind = x1.3 global, x1.35 speed on top of the cat's stats.
     const auto base = defender::speciesDefinition(EnemyType::Cat).base;
     const auto cat = computeStats({EnemyType::Cat, Element::Wind});
-    EXPECT_FLOAT_EQ(cat.speed(), base.speed() * 1.3f);
-    EXPECT_FLOAT_EQ(cat.health(), base.health() * 0.8f);
+    EXPECT_FLOAT_EQ(cat.speed(), base.speed() * 1.35f);
+    EXPECT_FLOAT_EQ(cat.health(), base.health() * 1.3f);
 }
 
 TEST(EnemyStats, HigherRanksAreBiggerAndTougher)
@@ -59,7 +82,7 @@ TEST(EnemyStats, HigherRanksAreBiggerAndTougher)
         lastHealth = stats.health();
         lastReward = stats.reward();
     }
-    EXPECT_FLOAT_EQ(computeStats({EnemyType::Duck, Element::Fire}).scale(), 1.f);
+    EXPECT_FLOAT_EQ(computeStats({EnemyType::Duck, Element::Normal}).scale(), 1.f);
 }
 
 TEST(EnemyStats, HelpersFillNeutralValues)
@@ -77,35 +100,75 @@ TEST(EnemyStats, HelpersFillNeutralValues)
 TEST(EnemyHooks, EarthArmorReducesHits)
 {
     auto earth = EnemyFactory::create(1, {EnemyType::Duck, Element::Earth}, LONG_PATH);
-    auto fire = EnemyFactory::create(2, {EnemyType::Duck, Element::Fire}, LONG_PATH);
-    EXPECT_FLOAT_EQ(earth->takeDamage(10.f), 8.f);  // armor 2
-    EXPECT_FLOAT_EQ(fire->takeDamage(10.f), 10.f);
+    auto normal = EnemyFactory::create(2, {EnemyType::Duck, Element::Normal}, LONG_PATH);
+    EXPECT_FLOAT_EQ(earth->takeDamage(10.f), 7.f);  // armor 3
+    EXPECT_FLOAT_EQ(normal->takeDamage(10.f), 10.f);
     // Armor never blocks more than 80%.
     EXPECT_FLOAT_EQ(earth->takeDamage(1.f), 0.2f);
 }
 
 TEST(EnemyHooks, ArmorLayersStack)
 {
-    // Orangutan (2) + earth (2) + boss (3) = 7.
+    // Orangutan (2) + earth (3) + boss (3) = 8.
     auto tank = EnemyFactory::create(1, {EnemyType::Orangutan, Element::Earth, Rank::Boss},
                                      LONG_PATH);
-    EXPECT_FLOAT_EQ(tank->takeDamage(20.f), 13.f);
+    EXPECT_FLOAT_EQ(tank->takeDamage(20.f), 12.f);
 }
 
-TEST(EnemyHooks, WaterRegeneratesUpToMaxHealth)
+TEST(EnemyHooks, RegenerationHealsUpToMaxHealth)
 {
-    auto enemy = EnemyFactory::create(1, {EnemyType::Frog, Element::Water}, LONG_PATH);
+    auto enemy = EnemyFactory::create(1, {EnemyType::Frog, Element::Normal}, LONG_PATH);
+    const auto regen = defender::regeneration(2.f);
     enemy->takeDamage(10.f);
     const float hurt = enemy->health();
-    enemy->update(1.f);
+    regen(*enemy, 1.f);
     EXPECT_FLOAT_EQ(enemy->health(), hurt + 2.f);
-    enemy->update(100.f);
+    regen(*enemy, 100.f);
     EXPECT_FLOAT_EQ(enemy->health(), enemy->maxHealth());
+}
+
+TEST(EnemyHooks, FireRisesFromItsAshesOnce)
+{
+    auto enemy = EnemyFactory::create(1, {EnemyType::Duck, Element::Fire}, LONG_PATH);
+    enemy->takeDamage(1e6f);
+    EXPECT_TRUE(enemy->isAlive());
+    EXPECT_FLOAT_EQ(enemy->health(), enemy->maxHealth() * 0.4f);
+    enemy->takeDamage(1e6f);
+    EXPECT_FALSE(enemy->isAlive());
+}
+
+TEST(EnemyHooks, WindDodgesOneHitOutOfFive)
+{
+    auto enemy = EnemyFactory::create(1, {EnemyType::Orangutan, Element::Wind}, LONG_PATH);
+    int dodged = 0;
+    for (int i = 0; i < 10; ++i)
+    {
+        dodged += enemy->takeDamage(1.f) == 0.f ? 1 : 0;
+    }
+    EXPECT_EQ(dodged, 2);
+}
+
+TEST(EnemyHooks, WaterLeavesANormalEnemyBehind)
+{
+    defender::EntityManager entities;
+    EnemyFactory factory(Biome::Ice, 3);
+    defender::WaveManager waves(entities, factory, LONG_PATH);
+    auto& frog = entities.spawnEnemy(
+        EnemyFactory::create(entities.nextId(), {EnemyType::Frog, Element::Water}, LONG_PATH));
+    frog.update(1.f);
+    const sf::Vector2f where = frog.getPosition();
+    frog.takeDamage(1e6f);
+    entities.removeDeadEntities();
+    waves.update(0.f);
+    ASSERT_EQ(entities.enemies().size(), 1u);
+    const auto& child = entities.enemies().front();
+    EXPECT_EQ(child->spec(), (defender::EnemySpec{EnemyType::Frog, Element::Normal, Rank::Normal}));
+    EXPECT_EQ(child->getPosition(), where);
 }
 
 TEST(EnemyHooks, CatSurvivesItsFirstDeadlyHit)
 {
-    auto cat = EnemyFactory::create(1, {EnemyType::Cat, Element::Fire}, LONG_PATH);
+    auto cat = EnemyFactory::create(1, {EnemyType::Cat, Element::Normal}, LONG_PATH);
     cat->takeDamage(1000.f);
     EXPECT_TRUE(cat->isAlive());
     EXPECT_FLOAT_EQ(cat->health(), 1.f);
@@ -115,7 +178,7 @@ TEST(EnemyHooks, CatSurvivesItsFirstDeadlyHit)
 
 TEST(EnemyHooks, DogRunsFasterWhenHurt)
 {
-    auto dog = EnemyFactory::create(1, {EnemyType::Dog, Element::Fire}, LONG_PATH);
+    auto dog = EnemyFactory::create(1, {EnemyType::Dog, Element::Normal}, LONG_PATH);
     const float speed = dog->speed();
     dog->takeDamage(dog->maxHealth() * 0.6f);
     dog->update(0.f);
@@ -173,7 +236,7 @@ TEST(SuperBoss, StopsSplittingAtMaxGeneration)
     EnemyFactory factory(Biome::Ice, 3);
     defender::WaveManager waves(entities, factory, LONG_PATH);
     auto& boss = entities.spawnEnemy(EnemyFactory::create(
-        entities.nextId(), {EnemyType::Duck, Element::Water, Rank::SuperBoss}, LONG_PATH,
+        entities.nextId(), {EnemyType::Duck, Element::Earth, Rank::SuperBoss}, LONG_PATH,
         defender::MAX_SPAWN_GENERATION));
     boss.takeDamage(1e9f);
     entities.removeDeadEntities();
@@ -190,28 +253,6 @@ TEST(SuperBoss, MoveBackFollowsThePath)
     EXPECT_NEAR(enemy->getPosition().y, 0.f, 0.01f);
     enemy->moveBack(5000.f);
     EXPECT_EQ(enemy->getPosition(), LONG_PATH.front());
-}
-
-// ── Waves ─────────────────────────────────────────────────────────────────────
-
-TEST(WaveRules, FirstWaveHasMiniBossesAndASuperBossLast)
-{
-    defender::EntityManager entities;
-    EnemyFactory factory(Biome::Desert, 8);
-    defender::WaveManager waves(entities, factory, LONG_PATH);
-    waves.startNextWave();
-    const auto* wave = waves.currentWaveData();
-    ASSERT_NE(wave, nullptr);
-    ASSERT_EQ(wave->enemies.size(), 30u);
-    int miniBosses = 0;
-    for (std::size_t i = 0; i < wave->enemies.size(); ++i)
-    {
-        miniBosses += wave->enemies[i].spec.rank == Rank::MiniBoss ? 1 : 0;
-    }
-    EXPECT_EQ(miniBosses, 2);  // 10th and 20th
-    EXPECT_EQ(wave->enemies[9].spec.rank, Rank::MiniBoss);
-    EXPECT_EQ(wave->enemies.back().spec.rank, Rank::SuperBoss);
-    EXPECT_EQ(wave->enemies.front().spec.rank, Rank::Normal);
 }
 
 TEST(EnemyClick, ContainsGrowsWithScale)

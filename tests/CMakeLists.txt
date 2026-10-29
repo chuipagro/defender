@@ -7,8 +7,11 @@ add_executable(defender_tests
         # <TESTS>
         test_enemy_definitions.cpp
         test_enemy_factory.cpp
+        test_level.cpp
         test_map_generator.cpp
+        test_player.cpp
         test_smoke.cpp
+        test_towers.cpp
         test_waves.cpp
         # </TESTS>
 )

@@ -30,4 +30,12 @@ struct WaveStarted
     int waveNumber = 0;
 };
 
+/// Emitted by LevelManager when every enemy of a wave is dead or gone.
+struct WaveCompleted
+{
+    int waveNumber = 0;
+    int bonusGold = 0;    ///< Before the player's gold bonus
+    int skillPoints = 0;
+};
+
 }  // namespace defender

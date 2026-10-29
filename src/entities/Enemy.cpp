@@ -86,8 +86,29 @@ void Enemy::update(float dt)
         }
     }
 
+    // Status effects
+    if (burnTimer_ > 0.f)
+    {
+        const float tick = std::min(dt, burnTimer_);
+        burnTimer_ -= tick;
+        takeDamage(burnDps_ * tick, true);
+        if (!alive_)
+        {
+            return;
+        }
+    }
+    const float walkSpeed = currentSpeed();
+    if (slowTimer_ > 0.f)
+    {
+        slowTimer_ = std::max(slowTimer_ - dt, 0.f);
+        if (slowTimer_ == 0.f)
+        {
+            slowFactor_ = 1.f;
+        }
+    }
+
     // Walk `speed * dt` pixels along the path, possibly past several points.
-    float remaining = speed() * dt;
+    float remaining = walkSpeed * dt;
     while (remaining > 0.f && pathIndex_ + 1 < path_.size())
     {
         const sf::Vector2f delta = path_[pathIndex_ + 1] - position_;
@@ -101,10 +122,12 @@ void Enemy::update(float dt)
             position_ = path_[pathIndex_ + 1];
             ++pathIndex_;
             remaining -= distance;
+            progress_ += distance;
         }
         else
         {
             position_ += delta * (remaining / distance);
+            progress_ += remaining;
             remaining = 0.f;
         }
     }
@@ -124,7 +147,7 @@ void Enemy::update(float dt)
     }
 }
 
-float Enemy::takeDamage(float amount)
+float Enemy::takeDamage(float amount, bool ignoreHooks)
 {
     if (!alive_ || amount <= 0.f)
     {
@@ -132,7 +155,7 @@ float Enemy::takeDamage(float amount)
     }
     for (const EnemyHooks* hooks : layers())
     {
-        if (hooks->onHit)
+        if (hooks->onHit && !ignoreHooks)
         {
             amount = std::max(hooks->onHit(*this, amount), 0.f);
         }
@@ -147,12 +170,49 @@ float Enemy::takeDamage(float amount)
     return amount;
 }
 
+float Enemy::currentSpeed() const
+{
+    return speed() * (slowTimer_ > 0.f ? slowFactor_ : 1.f);
+}
+
+void Enemy::applySlow(float factor, float seconds)
+{
+    if (!alive_ || seconds <= 0.f)
+    {
+        return;
+    }
+    factor = std::clamp(factor, 0.f, 1.f);
+    if (slowTimer_ <= 0.f || factor <= slowFactor_)
+    {
+        slowFactor_ = factor;
+    }
+    slowTimer_ = std::max(slowTimer_, seconds);
+}
+
+void Enemy::applyBurn(float damagePerSecond, float seconds)
+{
+    if (!alive_ || seconds <= 0.f)
+    {
+        return;
+    }
+    if (burnTimer_ <= 0.f || damagePerSecond >= burnDps_)
+    {
+        burnDps_ = damagePerSecond;
+        burnTimer_ = seconds;
+    }
+}
+
 void Enemy::heal(float amount)
 {
     if (alive_)
     {
         health_ = std::min(health_ + amount, maxHealth());
     }
+}
+
+void Enemy::setHealth(float health)
+{
+    health_ = std::clamp(health, 0.f, maxHealth());
 }
 
 void Enemy::runDeathHooks(EnemySpawner& spawner)
@@ -174,6 +234,11 @@ void Enemy::placeOnPath(std::size_t index, sf::Vector2f position)
     }
     pathIndex_ = std::min(index, path_.size() - 1);
     position_ = position;
+    progress_ = length(position_ - path_[pathIndex_]);
+    for (std::size_t i = 0; i < pathIndex_; ++i)
+    {
+        progress_ += length(path_[i + 1] - path_[i]);
+    }
 }
 
 void Enemy::moveBack(float distance)
@@ -186,10 +251,12 @@ void Enemy::moveBack(float distance)
         if (toPoint >= distance)
         {
             position_ += delta * (distance / toPoint);
+            progress_ = std::max(progress_ - distance, 0.f);
             return;
         }
         position_ = target;
         distance -= toPoint;
+        progress_ = std::max(progress_ - toPoint, 0.f);
         if (pathIndex_ == 0)
         {
             return;
@@ -216,6 +283,14 @@ void Enemy::render(sf::RenderTarget& target) const
     sprite.setScale(facingLeft_ ? -scale() : scale(), scale());
     // Whole pixels keep the pixel art crisp.
     sprite.setPosition(std::round(position_.x), std::round(position_.y));
+    if (burnTimer_ > 0.f)
+    {
+        sprite.setColor(sf::Color(255, 170, 120));
+    }
+    else if (slowTimer_ > 0.f)
+    {
+        sprite.setColor(sf::Color(150, 195, 255));
+    }
     target.draw(sprite);
 
     if (health_ < maxHealth() || spec_.rank != Rank::Normal)

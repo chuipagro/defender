@@ -14,7 +14,8 @@ namespace defender
 //  An enemy = species + element + rank. Each layer gives stats and hooks
 //  (functions run on spawn, every frame, on hit, on death, at the base).
 //  A hook receives the Enemy: it can read/change its stats, heal it, use its
-//  memory slots (enemy.memory(i)), etc.
+//  memory slots (species: MEMORY_SPECIES, element: MEMORY_ELEMENT,
+//  rank: MEMORY_RANK, so that layers never overwrite each other), etc.
 // ═════════════════════════════════════════════════════════════════════════════
 
 namespace
@@ -38,7 +39,7 @@ const std::array<SpeciesDefinition, ENEMY_TYPE_COUNT>& speciesTable()
          .hooks = {.onHit =
                        [](Enemy& cat, float damage)
                    {
-                       float& usedLife = cat.memory(0);
+                       float& usedLife = cat.memory(Enemy::MEMORY_SPECIES);
                        if (usedLife == 0.f && damage >= cat.health())
                        {
                            usedLife = 1.f;
@@ -52,7 +53,7 @@ const std::array<SpeciesDefinition, ENEMY_TYPE_COUNT>& speciesTable()
          .hooks = {.onUpdate =
                        [](Enemy& dog, float /*dt*/)
                    {
-                       float& enraged = dog.memory(0);
+                       float& enraged = dog.memory(Enemy::MEMORY_SPECIES);
                        if (enraged == 0.f && dog.health() < dog.maxHealth() * 0.5f)
                        {
                            enraged = 1.f;
@@ -70,27 +71,66 @@ const std::array<SpeciesDefinition, ENEMY_TYPE_COUNT>& speciesTable()
 }
 
 // ── Elements ──────────────────────────────────────────────────────────────────
+//
+// Elemental enemies are stronger than normal ones ("global" = health, gold and
+// damage) and each has a bonus effect.
+
+/// Health, gold and damage multiplied by `factor`, speed by `speed`.
+EnemyStats global(float factor, float speed = 1.f)
+{
+    return times({{Stat::Health, factor},
+                  {Stat::Reward, factor},
+                  {Stat::Damage, factor},
+                  {Stat::Speed, speed}});
+}
 
 const std::array<ModifierDefinition, ELEMENT_COUNT>& elementTable()
 {
     static const std::array<ModifierDefinition, ELEMENT_COUNT> table = {{
-        {.description = "Water: +5 gold, regenerates 2 hp/s.",
+        {.description = "Normal: natural colors, base stats.",
          .mult = times({}),
+         .add = plus({})},
+
+        {.description = "Water: x1.5 stats, +5 gold. Leaves a normal enemy behind when killed.",
+         .mult = global(1.5f),
          .add = plus({{Stat::Reward, 5.f}}),
-         .hooks = {.onUpdate = regeneration(2.f)}},
+         .hooks = {.onDeath =
+                       [](Enemy& enemy, EnemySpawner& spawner)
+                   {
+                       spawner.spawnChild(enemy, {enemy.type(), Element::Normal, Rank::Normal});
+                   }}},
 
-        {.description = "Fire: +15% speed, -10% health.",
-         .mult = times({{Stat::Speed, 1.15f}, {Stat::Health, 0.9f}}),
-         .add = plus({})},
-
-        {.description = "Earth: +30% health, armor 2, -15% speed.",
-         .mult = times({{Stat::Health, 1.3f}, {Stat::Speed, 0.85f}}),
+        {.description = "Fire: x1.4 stats, +20% speed. Rises from its ashes once (40% health).",
+         .mult = global(1.4f, 1.2f),
          .add = plus({}),
-         .hooks = {.onHit = armor(2.f)}},
+         .hooks = {.onHit =
+                       [](Enemy& enemy, float damage)
+                   {
+                       float& reborn = enemy.memory(Enemy::MEMORY_ELEMENT);
+                       if (reborn == 0.f && damage >= enemy.health())
+                       {
+                           reborn = 1.f;
+                           enemy.setHealth(enemy.maxHealth() * 0.4f);
+                           return 0.f;
+                       }
+                       return damage;
+                   }}},
 
-        {.description = "Wind: +30% speed, -20% health.",
-         .mult = times({{Stat::Speed, 1.3f}, {Stat::Health, 0.8f}}),
-         .add = plus({})},
+        {.description = "Earth: x1.5 stats, -15% speed. Stone skin: armor 3.",
+         .mult = global(1.5f, 0.85f),
+         .add = plus({}),
+         .hooks = {.onHit = armor(3.f)}},
+
+        {.description = "Wind: x1.3 stats, +35% speed. Dodges one hit out of 5.",
+         .mult = global(1.3f, 1.35f),
+         .add = plus({}),
+         .hooks = {.onHit =
+                       [](Enemy& enemy, float damage)
+                   {
+                       float& hits = enemy.memory(Enemy::MEMORY_ELEMENT);
+                       hits += 1.f;
+                       return static_cast<int>(hits) % 5 == 0 ? 0.f : damage;
+                   }}},
     }};
     return table;
 }
@@ -230,17 +270,24 @@ std::function<void(Enemy&, EnemySpawner&)> splitInto(int count, Rank rank)
     };
 }
 
-Rank rankInWave(int index, int size, const WaveRules& rules)
+int materialDrop(EnemySpec spec, float roll)
 {
-    if (index == size - 1)
+    if (spec.element == Element::Normal)
     {
-        return rules.lastEnemy;
+        return 0;
     }
-    if (rules.miniBossEvery > 0 && (index + 1) % rules.miniBossEvery == 0)
+    switch (spec.rank)
     {
-        return Rank::MiniBoss;
+        case Rank::Normal:
+            return roll < 0.35f ? 1 : 0;  // 35% chance
+        case Rank::MiniBoss:
+            return 2;
+        case Rank::Boss:
+            return 5;
+        case Rank::SuperBoss:
+            return 10;
     }
-    return Rank::Normal;
+    return 0;
 }
 
 }  // namespace defender

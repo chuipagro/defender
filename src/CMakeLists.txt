@@ -6,23 +6,33 @@ target_sources(defender_lib
     PRIVATE
         # <SOURCES>
         core/Game.cpp
+        core/Player.cpp
         defender_lib.cpp
         entities/Enemy.cpp
         entities/EnemyDefinitions.cpp
         entities/EnemyFactory.cpp
         entities/Projectile.cpp
         entities/Tower.cpp
+        entities/TowerDefinitions.cpp
         managers/EntityManager.cpp
+        managers/LevelManager.cpp
         managers/ResourceManager.cpp
         managers/WaveManager.cpp
         map/Map.cpp
         map/MapGenerator.cpp
         map/MapRenderer.cpp
         map/Maze.cpp
+        skills/SkillDefinitions.cpp
+        skills/SkillTree.cpp
         states/GameOverState.cpp
         states/MenuState.cpp
         states/PauseState.cpp
         states/PlayState.cpp
+        ui/BuildBar.cpp
+        ui/Hud.cpp
+        ui/SkillTreeMenu.cpp
+        ui/TowerPanel.cpp
+        ui/Ui.cpp
         # </SOURCES>
 )
 

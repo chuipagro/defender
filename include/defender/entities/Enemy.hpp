@@ -27,11 +27,18 @@ public:
     void update(float dt) override;
     void render(sf::RenderTarget& target) const override;
 
-    /// Applies damage after the onHit hooks (armor...). Returns the damage taken.
+    /// Applies damage after the onHit hooks (armor, dodge...), unless
+    /// `ignoreHooks` (used by burns). Returns the damage taken.
     /// Emits EnemyKilled when it dies.
-    float takeDamage(float amount);
+    float takeDamage(float amount, bool ignoreHooks = false);
+    /// Speed x `factor` (e.g. 0.6) for `seconds`. The strongest slow wins.
+    void applySlow(float factor, float seconds);
+    /// `damagePerSecond` for `seconds`, ignoring armor. A new burn replaces a weaker one.
+    void applyBurn(float damagePerSecond, float seconds);
     /// Restores health, up to max health.
     void heal(float amount);
+    /// Sets health (clamped to [0, max health]); does not kill.
+    void setHealth(float health);
     /// Runs the onDeath hooks of every layer (called by WaveManager on EnemyKilled).
     void runDeathHooks(EnemySpawner& spawner);
 
@@ -58,11 +65,18 @@ public:
     [[nodiscard]] float health() const { return health_; }
     [[nodiscard]] float maxHealth() const { return stats_.health(); }
     [[nodiscard]] float speed() const { return stats_.speed(); }
+    /// Speed with the slow applied.
+    [[nodiscard]] float currentSpeed() const;
+    [[nodiscard]] bool isSlowed() const { return slowTimer_ > 0.f; }
+    [[nodiscard]] bool isBurning() const { return burnTimer_ > 0.f; }
+    /// Pixels walked along the path (towers shoot the most advanced enemy).
+    [[nodiscard]] float progress() const { return progress_; }
     [[nodiscard]] int reward() const { return stats_.reward(); }
     [[nodiscard]] float damage() const { return stats_.damage(); }
     [[nodiscard]] float scale() const { return stats_.scale(); }
 
     /// Free slots for hooks to remember things (all start at 0).
+    /// Each layer has its own slot so they never overwrite each other.
     [[nodiscard]] float& memory(std::size_t slot) { return memory_.at(slot); }
 
     /// True once it walked to the last point of the path.
@@ -73,6 +87,10 @@ public:
     static constexpr int FRAME_COUNT = 4;
     static constexpr float FRAME_TIME = 0.12f;
     static constexpr std::size_t MEMORY_SLOTS = 4;
+    static constexpr std::size_t MEMORY_SPECIES = 0;
+    static constexpr std::size_t MEMORY_ELEMENT = 1;
+    static constexpr std::size_t MEMORY_RANK = 2;
+    static constexpr std::size_t MEMORY_EXTRA = 3;
 
 private:
     /// Species, element and rank hooks, in that order.
@@ -90,6 +108,11 @@ private:
     bool facingLeft_ = false;
     float animationTime_ = 0.f;
     std::array<float, MEMORY_SLOTS> memory_{};
+    float progress_ = 0.f;
+    float slowFactor_ = 1.f;
+    float slowTimer_ = 0.f;
+    float burnDps_ = 0.f;
+    float burnTimer_ = 0.f;
     std::string textureId_;  ///< "sprites/enemies/<element>/<type>.png"
 };
 

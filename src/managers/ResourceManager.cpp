@@ -40,7 +40,6 @@ Resource& loadOnce(Map& cache, const std::string& id)
     {
         throw std::runtime_error("Cannot load asset: assets/" + id);
     }
-    // unordered_map keeps references valid when it grows.
     return cache.emplace(id, std::move(resource)).first->second;
 }
 

@@ -27,7 +27,7 @@ struct WaveData
     float spawnInterval = 1.f;  ///< Seconds between two enemies
 };
 
-/// Builds waves with the EnemyFactory and spawns them over time.
+/// Spawns the enemies of one wave over time (LevelManager decides what is in it).
 /// Also runs the onDeath hooks of killed enemies, and spawns their children.
 ///
 /// Not copyable nor movable: it is subscribed to the EventBus with `this`.
@@ -35,7 +35,7 @@ class WaveManager : public EnemySpawner
 {
 public:
     WaveManager(EntityManager& entityManager, EnemyFactory& factory,
-                std::span<const sf::Vector2f> path, const WaveRules& rules = WAVE_RULES);
+                std::span<const sf::Vector2f> path);
     ~WaveManager() override;
 
     WaveManager(const WaveManager&) = delete;
@@ -46,8 +46,8 @@ public:
     /// Spawns the enemies of the current wave as their time comes, and the
     /// children of enemies killed since the last update.
     void update(float dt);
-    /// Builds the next wave with the factory and starts spawning it.
-    void startNextWave();
+    /// Starts spawning `data` (the first enemy comes right away).
+    void startWave(int number, WaveData data);
     /// True once every enemy of the current wave spawned (children included)
     /// and none is alive.
     [[nodiscard]] bool isWaveComplete() const;
@@ -59,9 +59,8 @@ public:
     /// The current wave's plan.
     [[nodiscard]] const WaveData* currentWaveData() const;
 
-    /// Number of enemies in a given wave (wave 1 = 30).
-    [[nodiscard]] int enemiesInWave(int wave) const;
-    [[nodiscard]] const WaveRules& rules() const { return rules_; }
+    /// Enemies of the current wave not spawned yet + alive on the map.
+    [[nodiscard]] int remainingEnemies() const;
 
     // EnemySpawner (used by onDeath hooks)
     [[nodiscard]] EnemySpec rollSpec() override;
@@ -80,12 +79,9 @@ private:
         float backOffset;
     };
 
-    /// Rolls the factory to fill a wave of `count` enemies.
-    [[nodiscard]] WaveData buildWave(int count);
     [[nodiscard]] bool allSpawned() const;
     void spawnPendingChildren();
 
-    WaveRules rules_;
     std::vector<WaveData> waves_;
     std::vector<PendingChild> pendingChildren_;
     float spawnTimer_ = 0.f;

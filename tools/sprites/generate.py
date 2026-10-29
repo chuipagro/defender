@@ -7,6 +7,9 @@ Output (one horizontal sprite sheet per file, frames left to right):
     <out>/enemies/<element>/<enemy>.png   4 frames of 32x32
     <out>/towers/<element>.png            4 frames of 32x48
     <out>/tiles/<biome>.png               16x2 tiles of 32x32 (see tiles.py)
+    <out>/projectiles/<name>.png          4 frames of 16x16, flying right
+    <out>/ui/font.png, <out>/ui/icons.png  pixel font and 16x16 icons (see ui.py)
+<element> is "normal" (natural colors) or one of the elements.
 With --preview, also writes zoomed overview images into DIR.
 """
 
@@ -17,11 +20,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from canvas import Canvas, render, scale, write_png  # noqa: E402
-from palettes import BIOMES, ELEMENTS, resolve, resolve_biome  # noqa: E402
+from palettes import ALL_ELEMENTS, BIOMES, hex_to_rgba, resolve, resolve_biome  # noqa: E402
 import enemies  # noqa: E402
 import map_preview  # noqa: E402
+import projectiles  # noqa: E402
 import tiles  # noqa: E402
 import towers  # noqa: E402
+import ui  # noqa: E402
 
 PREVIEW_BG = (58, 63, 74, 255)
 PREVIEW_ZOOM = 4
@@ -84,18 +89,26 @@ def main():
     args = parser.parse_args()
 
     count = 0
-    for element in ELEMENTS:
-        palette = resolve(element)
+    for element in ALL_ELEMENTS:
         for name, builder in enemies.ENEMIES.items():
             save_sheet(os.path.join(args.out, "enemies", element, f"{name}.png"),
-                       sheet(builder, enemies.FRAMES), palette)
+                       sheet(builder, enemies.FRAMES), resolve(element, name))
             count += 1
         for name, builder in towers.TOWERS.items():
             if towers.ELEMENT_OF.get(name, name) != element:
                 continue
             save_sheet(os.path.join(args.out, "towers", f"{name}.png"),
-                       sheet(builder, towers.FRAMES), palette)
+                       sheet(builder, towers.FRAMES), resolve(element))
             count += 1
+    for name, (builder, element) in projectiles.PROJECTILES.items():
+        save_sheet(os.path.join(args.out, "projectiles", f"{name}.png"),
+                   sheet(builder, projectiles.FRAMES), resolve(element))
+        count += 1
+    ui_palette = {k: hex_to_rgba(v) for k, v in ui.UI_PALETTE.items()}
+    save_sheet(os.path.join(args.out, "ui", "font.png"), [ui.font_sheet()], ui_palette)
+    icons = [builder() for builder in ui.ICONS.values()]
+    save_sheet(os.path.join(args.out, "ui", "icons.png"), icons, ui_palette)
+    count += 2
     for biome in BIOMES:
         path = os.path.join(args.out, "tiles", f"{biome}.png")
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -106,12 +119,17 @@ def main():
     if args.preview:
         os.makedirs(args.preview, exist_ok=True)
         # Enemies: one row per enemy, every element side by side.
-        lines = [[(sheet(b, enemies.FRAMES), resolve(e)) for e in ELEMENTS]
-                 for b in enemies.ENEMIES.values()]
+        lines = [[(sheet(b, enemies.FRAMES), resolve(e, n)) for e in ALL_ELEMENTS]
+                 for n, b in enemies.ENEMIES.items()]
         preview(os.path.join(args.preview, "enemies.png"), lines)
         lines = [[(sheet(b, towers.FRAMES), resolve(towers.ELEMENT_OF.get(n, n)))
                   for n, b in towers.TOWERS.items()]]
         preview(os.path.join(args.preview, "towers.png"), lines)
+        preview(os.path.join(args.preview, "projectiles.png"),
+                [[(sheet(b, projectiles.FRAMES), resolve(e))
+                  for b, e in projectiles.PROJECTILES.values()]])
+        preview(os.path.join(args.preview, "ui.png"),
+                [[(icons, ui_palette)], [([ui.font_sheet()], ui_palette)]])
         # Maps: the same sample maze in every biome, 2x2.
         grid, _ = map_preview.sample_map(25, 17, seed=42)
         maps = [render_grid(map_preview.compose(tiles.biome_sheet(b), grid), resolve_biome(b))

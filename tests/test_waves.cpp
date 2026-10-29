@@ -79,27 +79,32 @@ TEST(EnemyMovement, KilledEnemyDidNotReachTheEnd)
 
 // ── Waves ────────────────────────────────────────────────────────────────────
 
-TEST(Waves, FirstWaveHas30Enemies)
+namespace
 {
-    defender::EntityManager entities;
-    EnemyFactory factory(Biome::Forest, 1);
-    const defender::WaveManager waves(entities, factory, L_PATH);
-    EXPECT_EQ(waves.enemiesInWave(1), 30);
+
+defender::WaveData wavePlan(int count, float interval)
+{
+    defender::WaveData data;
+    data.spawnInterval = interval;
+    for (int i = 0; i < count; ++i)
+    {
+        data.enemies.push_back({{EnemyType::Cat, Element::Normal}, 1, 0.f});
+    }
+    return data;
 }
 
-TEST(Waves, Wave1SpawnsAll30ThenCompletes)
+}  // namespace
+
+TEST(Waves, WaveSpawnsEveryoneThenCompletes)
 {
     defender::EntityManager entities;
     EnemyFactory factory(Biome::Ice, 5);
     defender::WaveManager waves(entities, factory, L_PATH);
-    waves.startNextWave();
+    waves.startWave(1, wavePlan(12, 0.5f));
     EXPECT_EQ(waves.getCurrentWave(), 1);
-    EXPECT_EQ(waves.waveSize(), 30);
+    EXPECT_EQ(waves.waveSize(), 12);
+    EXPECT_EQ(waves.remainingEnemies(), 12);
     EXPECT_FALSE(waves.isWaveComplete());
-
-    // Nothing before the first delay.
-    waves.update(defender::WAVE_RULES.firstSpawnDelay * 0.5f);
-    EXPECT_EQ(waves.spawnedCount(), 0);
 
     // Simulate the game loop at 60 fps until the wave is over.
     const float dt = 1.f / 60.f;
@@ -118,10 +123,10 @@ TEST(Waves, Wave1SpawnsAll30ThenCompletes)
     }
 
     EXPECT_TRUE(waves.isWaveComplete());
-    EXPECT_EQ(waves.spawnedCount(), 30);
-    EXPECT_EQ(reached, 30) << "every enemy must walk to the end";
-    EXPECT_TRUE(entities.enemies().empty());
-    EXPECT_LT(maxOnMap, 30) << "enemies spawn one after the other, not all at once";
+    EXPECT_EQ(waves.spawnedCount(), 12);
+    EXPECT_EQ(waves.remainingEnemies(), 0);
+    EXPECT_EQ(reached, 12) << "every enemy must walk to the end";
+    EXPECT_LT(maxOnMap, 12) << "enemies spawn one after the other, not all at once";
 }
 
 TEST(Waves, SpawnsOneEnemyPerInterval)
@@ -130,9 +135,9 @@ TEST(Waves, SpawnsOneEnemyPerInterval)
     defender::EntityManager entities;
     EnemyFactory factory(Biome::Desert, 1);
     defender::WaveManager waves(entities, factory, longPath);
-    waves.startNextWave();
-    waves.update(defender::WAVE_RULES.firstSpawnDelay);
+    waves.startWave(1, wavePlan(10, 0.7f));
+    waves.update(0.f);
     EXPECT_EQ(waves.spawnedCount(), 1);
-    waves.update((defender::WAVE_RULES.spawnInterval * 3.f) + 0.001f);  // float margin
+    waves.update((0.7f * 3.f) + 0.001f);  // float margin
     EXPECT_EQ(waves.spawnedCount(), 4);
 }

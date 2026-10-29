@@ -201,7 +201,54 @@ def wind_tower(frame):
     return c
 
 
+# ── Normal: wooden parapet + crossbow ────────────────────────────────────────
+
+def crossbow_arm(c, x, y0, y1, bend):
+    """Steel bow arm from (x, y0) to (x, y1), bent forward by `bend` pixels."""
+    mid = (y0 + y1) / 2
+    for y in range(y0, y1 + 1):
+        t = abs(y - mid) / ((y1 - y0) / 2)
+        bx = round(x + bend * (1 - t * t))
+        c.set(bx - 1, y, "O")
+        c.set(bx, y, "b" if y < mid else "a")
+        c.set(bx + 1, y, "O")
+
+
+def normal_tower(frame):
+    c = Canvas(W, H)
+    pillar(c)
+    # Wooden parapet with crenels
+    c.rect(5, 15, 22, 7, "O")
+    for y in range(16, 21):
+        c.rect(6, y, 20, 1, "3" if y == 16 else "2" if y < 20 else "1")
+    for x in range(9, 25, 5):
+        c.rect(x, 16, 1, 5, "1")                     # plank joints
+    for x in (5, 12, 19):
+        c.rect(x, 11, 8 if x == 19 else 6, 5, "O")    # crenels
+        c.rect(x + 1, 12, (6 if x == 19 else 4), 3, "3")
+        c.rect(x + 1, 12, 1, 3, "4")
+    # Crossbow: the string is pulled back, then the bolt is shot (frame 3).
+    pull = [0, 2, 4, 0][frame]
+    c.rect(8, 8, 15, 3, "O")                          # stock
+    c.rect(9, 9, 13, 1, "3")
+    crossbow_arm(c, 22, 1, 15, 2)
+    for y in range(2, 15):                            # string, to the pulled point
+        t = abs(y - 8) / 6
+        sx = round(21 - pull * (1 - t))
+        c.set(sx, y, "4")
+    if frame < 3:
+        c.rect(21 - pull, 7, 9, 1, "k")               # loaded bolt
+        c.set(30 - pull, 7, "b")
+        c.set(29 - pull, 6, "a")
+        c.set(29 - pull, 8, "a")
+    else:
+        c.rect(26, 7, 5, 1, "k")                      # bolt leaving
+        c.set(31, 7, "b")
+    return c
+
+
 TOWERS = {
+    "normal": normal_tower,
     "fire": fire_tower,
     "water": water_tower,
     "earth": earth_tower,

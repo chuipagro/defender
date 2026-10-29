@@ -6,10 +6,10 @@
 namespace defender
 {
 
-Tower& EntityManager::addTower(sf::Vector2f position, TowerType type)
+Tower& EntityManager::addTower(TowerType type, GridPos tile, sf::Vector2f position,
+                               const TowerUpgrades& upgrades)
 {
-    // TODO: stats per tower type, gold check.
-    towers_.push_back(std::make_unique<Tower>(nextId(), type, position, TowerStats{}));
+    towers_.push_back(std::make_unique<Tower>(nextId(), type, tile, position, upgrades));
     return *towers_.back();
 }
 
@@ -25,40 +25,107 @@ Projectile& EntityManager::addProjectile(std::unique_ptr<Projectile> projectile)
     return *projectiles_.back();
 }
 
-void EntityManager::updateAll(float dt)
+Tower* EntityManager::towerAt(GridPos tile) const
+{
+    const auto it = std::ranges::find_if(towers_, [tile](const auto& tower)
+                                         { return tower->isAlive() && tower->tile() == tile; });
+    return it == towers_.end() ? nullptr : it->get();
+}
+
+void EntityManager::refreshTowers(const TowerUpgrades& upgrades)
 {
     for (const auto& tower : towers_)
     {
-        tower->update(dt);
-        tower->shoot(enemies_);
+        tower->refreshStats(upgrades);
     }
+}
+
+void EntityManager::updateAll(float dt)
+{
+    // Enemies move first, so towers aim at where they are now.
     for (const auto& enemy : enemies_)
     {
         enemy->update(dt);
     }
+    for (const auto& tower : towers_)
+    {
+        tower->update(dt);
+        if (!tower->isAlive() || !tower->isReady())
+        {
+            continue;
+        }
+        if (const auto target = tower->pickTarget(enemies_))
+        {
+            const Shot shot = tower->fire(*target);
+            projectiles_.push_back(std::make_unique<Projectile>(
+                nextId(), tower->muzzle(), target, shot, tower->stats().projectileSpeed));
+        }
+    }
     for (const auto& projectile : projectiles_)
     {
         projectile->update(dt);
+        if (projectile->isAlive() && projectile->hasImpact())
+        {
+            resolveImpact(*projectile);
+            projectile->consume();
+        }
+    }
+}
+
+void EntityManager::resolveImpact(const Projectile& projectile)
+{
+    const Shot& shot = projectile.shot();
+    const auto& onHit = towerDefinition(shot.type).onHit;
+    auto hit = [&](Enemy& enemy)
+    {
+        enemy.takeDamage(shot.damage);
+        if (onHit && enemy.isAlive())
+        {
+            onHit(enemy, shot);
+        }
+    };
+
+    if (shot.splash > 0.f)
+    {
+        const float radiusSquared = shot.splash * shot.splash;
+        for (const auto& enemy : enemies_)
+        {
+            const sf::Vector2f d = enemy->getPosition() - projectile.getPosition();
+            if (enemy->isAlive() && (d.x * d.x) + (d.y * d.y) <= radiusSquared)
+            {
+                hit(*enemy);
+            }
+        }
+        return;
+    }
+    if (const auto target = projectile.target())
+    {
+        hit(*target);
     }
 }
 
 void EntityManager::renderAll(sf::RenderTarget& target) const
 {
-    // Draw enemies from top to bottom so the lower ones overlap the upper ones.
-    std::vector<const Enemy*> sorted;
-    sorted.reserve(enemies_.size());
+    // One depth-sorted list: something lower on screen is drawn in front.
+    struct Item
+    {
+        float depth;
+        const Entity* entity;
+    };
+    std::vector<Item> items;
+    items.reserve(enemies_.size() + towers_.size());
     for (const auto& enemy : enemies_)
     {
-        sorted.push_back(enemy.get());
-    }
-    std::ranges::sort(sorted, {}, [](const Enemy* e) { return e->getPosition().y; });
-    for (const Enemy* enemy : sorted)
-    {
-        enemy->render(target);
+        items.push_back({enemy->getPosition().y, enemy.get()});
     }
     for (const auto& tower : towers_)
     {
-        tower->render(target);
+        items.push_back({tower->getPosition().y + 8.f, tower.get()});
+    }
+    std::ranges::stable_sort(items, {}, &Item::depth);
+    for (const Item& item : items)
+    {
+        item.entity->render(target);
     }
     for (const auto& projectile : projectiles_)
     {

@@ -40,7 +40,9 @@ public:
                           const SpawnTable& table = defaultSpawnTable());
 
     /// Draws what the next enemy will be (species and element; rank as given).
-    [[nodiscard]] EnemySpec roll(Rank rank = Rank::Normal);
+    /// `elementalFactor` multiplies the weight of every element but Normal:
+    /// 2 = elemental enemies twice as likely as in the table.
+    [[nodiscard]] EnemySpec roll(Rank rank = Rank::Normal, double elementalFactor = 1.0);
 
     /// Draws a spec and builds the enemy.
     [[nodiscard]] std::unique_ptr<Enemy> create(EntityId id, std::span<const sf::Vector2f> path);

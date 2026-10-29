@@ -9,18 +9,20 @@ namespace defender
 
 using EntityId = std::uint32_t;
 
-/// Elements shared by enemies and towers.
+/// Elements shared by enemies and towers. Normal = no element (natural
+/// colors, base stats); the others are stronger and have bonus effects.
 /// Adding one (Ice, Magma, Lightning...) means adding a column to every
 /// row of the spawn table in EnemyFactory.cpp — it will not compile otherwise.
 enum class Element : std::uint8_t
 {
+    Normal,
     Water,
     Fire,
     Earth,
     Wind,
 };
 
-inline constexpr std::size_t ELEMENT_COUNT = 4;
+inline constexpr std::size_t ELEMENT_COUNT = 5;
 
 enum class EnemyType : std::uint8_t
 {
@@ -52,7 +54,7 @@ using TowerType = Element;
 struct EnemySpec
 {
     EnemyType type = EnemyType::Cat;
-    Element element = Element::Water;
+    Element element = Element::Normal;
     Rank rank = Rank::Normal;
 
     bool operator==(const EnemySpec&) const = default;
@@ -63,6 +65,8 @@ constexpr std::string_view elementName(Element element)
 {
     switch (element)
     {
+        case Element::Normal:
+            return "normal";
         case Element::Water:
             return "water";
         case Element::Fire:
@@ -72,7 +76,7 @@ constexpr std::string_view elementName(Element element)
         case Element::Wind:
             return "wind";
     }
-    return "water";
+    return "normal";
 }
 
 constexpr std::string_view rankName(Rank rank)
