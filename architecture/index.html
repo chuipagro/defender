@@ -605,19 +605,63 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#wave-composition" class="md-nav__link">
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#levelmanager-difficulty" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wave composition
+        LevelManager (difficulty)
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#towers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Towers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#player" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Player
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#skill-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skill tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI
+      
+    </span>
+  </a>
   
 </li>
       
@@ -886,19 +930,63 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#wave-composition" class="md-nav__link">
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#levelmanager-difficulty" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wave composition
+        LevelManager (difficulty)
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#towers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Towers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#player" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Player
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#skill-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skill tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UI
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1347,20 +1435,24 @@ and remember things in <code>enemy.memory(0..3)</code>. Ready-made hooks: <code>
 <td>+30% speed below half health</td>
 </tr>
 <tr>
+<td>Normal</td>
+<td>natural colors, base stats</td>
+</tr>
+<tr>
 <td>Water</td>
-<td>+5 gold, regenerates 2 hp/s</td>
+<td>×1.5 health/gold/damage, +5 gold, leaves a normal enemy behind when killed</td>
 </tr>
 <tr>
 <td>Fire</td>
-<td>×1.15 speed, ×0.9 health</td>
+<td>×1.4 health/gold/damage, ×1.2 speed, rises from its ashes once (40% health)</td>
 </tr>
 <tr>
 <td>Earth</td>
-<td>×1.3 health, ×0.85 speed, armor 2</td>
+<td>×1.5 health/gold/damage, ×0.85 speed, armor 3</td>
 </tr>
 <tr>
 <td>Wind</td>
-<td>×1.3 speed, ×0.8 health</td>
+<td>×1.3 health/gold/damage, ×1.35 speed, dodges one hit out of 5</td>
 </tr>
 <tr>
 <td>Mini-boss</td>
@@ -1376,7 +1468,9 @@ and remember things in <code>enemy.memory(0..3)</code>. Ready-made hooks: <code>
 </tr>
 </tbody>
 </table>
-<p>Armor removes <code>n</code> from each hit but always lets 20% through; armor hooks stack.</p>
+<p>Armor removes <code>n</code> from each hit but always lets 20% through; armor hooks stack.
+Each layer has its own memory slot (<code>Enemy::MEMORY_SPECIES</code>, <code>MEMORY_ELEMENT</code>,
+<code>MEMORY_RANK</code>) so their hooks never overwrite each other.</p>
 <h3 id="super-boss-split">Super boss split<a class="headerlink" href="#super-boss-split" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>sequenceDiagram
     participant E as Enemy (super boss)
@@ -1392,16 +1486,178 @@ and remember things in <code>enemy.memory(0..3)</code>. Ready-made hooks: <code>
 <p>Children keep the element, roll their species with the biome matrices, and get
 <code>generation + 1</code>; splitting stops at <code>MAX_SPAWN_GENERATION</code> (3). A wave is not
 complete while children are waiting to spawn.</p>
-<h3 id="wave-composition">Wave composition<a class="headerlink" href="#wave-composition" title="Permanent link">&para;</a></h3>
-<p><code>WAVE_RULES</code> (<code>EnemyDefinitions.hpp</code>): 30 enemies in wave 1, +5 per wave, every
-10th enemy is a mini-boss, the last one is a super boss, 0.7 s between spawns.</p>
+<hr />
+<h2 id="levelmanager-difficulty">LevelManager (difficulty)<a class="headerlink" href="#levelmanager-difficulty" title="Permanent link">&para;</a></h2>
+<p>A level is 150 waves played one after the other:
+<code>Break (8 s, N / play button to skip) → Running → WaveCompleted → Break → ...</code>
+until wave 150 is cleared (<code>Phase::Victory</code>).</p>
+<p>Each wave gets a <code>WavePlan</code> from <code>planForWave(wave)</code>, built from curves of
+<code>{wave, value}</code> points (linear in between) at the top of <code>LevelManager.cpp</code>:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Wave</th>
+<th style="text-align: right;">Enemies</th>
+<th style="text-align: right;">Mini-boss</th>
+<th style="text-align: right;">Boss</th>
+<th style="text-align: right;">Super boss</th>
+<th style="text-align: right;">Elemental factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">0.2</td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">3%</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">0.3</td>
+</tr>
+<tr>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">4.9%</td>
+<td style="text-align: right;">1%</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">0.45</td>
+</tr>
+<tr>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">75</td>
+<td style="text-align: right;">8%</td>
+<td style="text-align: right;">2%</td>
+<td style="text-align: right;">0.5%</td>
+<td style="text-align: right;">0.8</td>
+</tr>
+<tr>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">200</td>
+<td style="text-align: right;">15%</td>
+<td style="text-align: right;">5%</td>
+<td style="text-align: right;">2%</td>
+<td style="text-align: right;">1.5</td>
+</tr>
+<tr>
+<td style="text-align: right;">150</td>
+<td style="text-align: right;">200</td>
+<td style="text-align: right;">25%</td>
+<td style="text-align: right;">10%</td>
+<td style="text-align: right;">5%</td>
+<td style="text-align: right;">3</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>A rank always shows up at least once on its unlock wave (10, 25, 50).</li>
+<li>Counts per rank are <code>count × share</code>, rounded at random; the strongest enemy closes the wave.</li>
+<li>The elemental factor multiplies the weight of every element but Normal in the
+  biome matrix (1 = half of the enemies are elemental).</li>
+<li>Cleared wave: <code>20 + 5 × wave</code> gold, 1 skill point (3 every 10th wave).</li>
+</ul>
+<hr />
+<h2 id="towers">Towers<a class="headerlink" href="#towers" title="Permanent link">&para;</a></h2>
+<p>Defined in C++ in <code>src/entities/TowerDefinitions.cpp</code> (<code>TowerDefinition</code>: price,
+damage, range, fire rate, projectile sprite, splash, upgrade costs, <code>onHit</code> effect).</p>
+<table>
+<thead>
+<tr>
+<th>Tower</th>
+<th style="text-align: right;">Gold</th>
+<th>Projectile</th>
+<th>Effect</th>
+<th>Upgrades (level 2 / 3)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normal</td>
+<td style="text-align: right;">50</td>
+<td>arrow</td>
+<td>fast shots</td>
+<td>60 / 120 gold</td>
+</tr>
+<tr>
+<td>Water</td>
+<td style="text-align: right;">80</td>
+<td>bubble</td>
+<td>slows to 60% speed for 1.5 s</td>
+<td>90 g + 3 / 180 g + 8 water drops</td>
+</tr>
+<tr>
+<td>Fire</td>
+<td style="text-align: right;">90</td>
+<td>fireball</td>
+<td>burns 6 hp/s for 3 s (ignores armor)</td>
+<td>100 g + 3 / 200 g + 8 embers</td>
+</tr>
+<tr>
+<td>Earth</td>
+<td style="text-align: right;">100</td>
+<td>rock</td>
+<td>splash damage (40 px)</td>
+<td>110 g + 3 / 220 g + 8 stones</td>
+</tr>
+<tr>
+<td>Wind</td>
+<td style="text-align: right;">85</td>
+<td>gust</td>
+<td>pushes back 20 px (less for big enemies)</td>
+<td>95 g + 3 / 190 g + 8 feathers</td>
+</tr>
+</tbody>
+</table>
+<p>Each level: damage +50%, range +10%, fire rate +15%, effects +25%. Skill tree
+bonuses (<code>TowerUpgrades</code>) multiply on top. Selling gives back 60% of the gold spent.</p>
+<p>Shooting (<code>EntityManager::updateAll</code>): enemies move, each ready tower picks the
+alive enemy in range with the highest <code>progress()</code> (furthest along the path) and
+fires a <code>Projectile</code> carrying a <code>Shot</code>. Projectiles home in on their target; on
+arrival <code>resolveImpact</code> applies the damage (target or splash) and the tower's <code>onHit</code>.</p>
+<p><strong>Materials</strong>: elemental enemies drop materials of their element when killed
+(<code>materialDrop</code>: 35% chance of 1 for a normal rank, 2 / 5 / 10 for mini-boss /
+boss / super boss). They fly to their counter in the build bar.</p>
+<hr />
+<h2 id="player">Player<a class="headerlink" href="#player" title="Permanent link">&para;</a></h2>
+<p>Gold (enemy rewards + end-of-wave bonus), elemental materials, health (50), shield (0 until unlocked,
+absorbs damage first, refilled at the end of each wave), skill points.</p>
+<h2 id="skill-tree">Skill tree<a class="headerlink" href="#skill-tree" title="Permanent link">&para;</a></h2>
+<p>Nodes are defined in C++ in <code>src/skills/SkillDefinitions.cpp</code>: cost in skill
+points, prerequisites, position in the menu, icon or tower sprite, and an
+<code>effect(Player&amp;, TowerUpgrades&amp;)</code> run once when bought.</p>
+<ul>
+<li><strong>Towers</strong>: normal tower (owned from the start) → water, fire, earth, wind towers,
+  each with <em>Puissance</em> (+25% damage) and <em>Cadence</em> (+20% fire rate).</li>
+<li><strong>Base</strong>: max health, shield, reinforced shield, +25% wave gold.</li>
+</ul>
+<p><code>TowerUpgrades</code> (unlocked towers + damage/range/fire-rate multipliers) is what
+the tower system will read.</p>
+<h2 id="ui">UI<a class="headerlink" href="#ui" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>ui/Ui.hpp</code>: pixel font (<code>sprites/ui/font.png</code>, ASCII + é è ê à â ç ù û ô î),
+  icons (<code>sprites/ui/icons.png</code>, <code>enum class Icon</code>), panels, lines.</li>
+<li><code>Hud</code>: top bar (health, shield, gold, points, wave, enemies left, next-wave /
+  speed / skill-tree buttons).</li>
+<li><code>SkillTreeMenu</code>: full-screen tree (T or the tree button), pauses the game.</li>
+<li><code>BuildBar</code>: bottom bar, tower buttons (keys 1-5) and material counters.</li>
+<li><code>TowerPanel</code>: next to the selected tower: level, stats, upgrade (U) and sell.</li>
+</ul>
+<p>Controls: 1-5 / build bar = choose a tower, left click on a slab = place (stays in
+build mode), right click / Escape = cancel, click a tower = select it.</p>
 <hr />
 <h2 id="wavemanager">WaveManager<a class="headerlink" href="#wavemanager" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>classDiagram
     class WaveManager {
         +update(dt: float)
-        +startNextWave()
         +isWaveComplete() bool
+        +startWave(number: int, data: WaveData)
+        +remainingEnemies() int
         +getCurrentWave() int
         +rollSpec() EnemySpec
         +spawnChild(parent: Enemy, spec: EnemySpec)
@@ -1486,34 +1742,47 @@ complete while children are waiting to spawn.</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── core/
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│   ├── Game.hpp / Game.cpp
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│   ├── StateMachine.hpp          ← std::variant&lt;MenuState, PlayState, ...&gt;
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│   ├── EventBus.hpp              ← template header-only
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│   ├── Events.hpp                ← EnemyKilled, WaveStarted...
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│   └── Concepts.hpp              ← Updatable, Renderable, Damageable
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>├── states/
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>│   ├── MenuState.hpp / .cpp
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>│   ├── PlayState.hpp / .cpp
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>│   ├── PauseState.hpp / .cpp
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>│   └── GameOverState.hpp / .cpp
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>├── entities/
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>│   ├── Types.hpp                 ← Element, EnemyType, Rank, EnemySpec
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>│   ├── Stats.hpp                 ← Stat, EnemyStats
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>│   ├── EnemyDefinitions.hpp / .cpp ← species/element/rank stats + hooks, wave rules
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>│   ├── Entity.hpp                ← abstract base
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>│   ├── Tower.hpp / .cpp
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>│   ├── Enemy.hpp / .cpp
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>│   ├── EnemyFactory.hpp / .cpp   ← biome probability matrices
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>│   └── Projectile.hpp / .cpp
-<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>├── managers/
-<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>│   ├── EntityManager.hpp / .cpp
-<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>│   ├── WaveManager.hpp / .cpp
-<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>│   └── ResourceManager.hpp / .cpp
-<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>├── map/
-<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>│   ├── Tile.hpp                  ← TileType, Biome, GridPos
-<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>│   ├── Map.hpp / .cpp
-<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>│   ├── Maze.hpp / .cpp           ← perfect maze (recursive backtracker)
-<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>│   ├── MapGenerator.hpp / .cpp
-<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>│   └── MapRenderer.hpp / .cpp
-<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>└── defender_lib.cpp              ← CMake stub
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│   ├── Player.hpp / .cpp         ← gold, health, shield, skill points
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│   ├── EventBus.hpp              ← template header-only
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│   ├── Events.hpp                ← EnemyKilled, WaveStarted...
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>│   └── Concepts.hpp              ← Updatable, Renderable, Damageable
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>├── states/
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>│   ├── MenuState.hpp / .cpp
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>│   ├── PlayState.hpp / .cpp
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>│   ├── PauseState.hpp / .cpp
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>│   └── GameOverState.hpp / .cpp
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>├── entities/
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>│   ├── Types.hpp                 ← Element, EnemyType, Rank, EnemySpec
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>│   ├── Stats.hpp                 ← Stat, EnemyStats
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>│   ├── EnemyDefinitions.hpp / .cpp ← species/element/rank stats + hooks, loot
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>│   ├── TowerDefinitions.hpp / .cpp ← tower stats, levels, costs, effects
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>│   ├── Entity.hpp                ← abstract base
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>│   ├── Tower.hpp / .cpp
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>│   ├── Enemy.hpp / .cpp
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>│   ├── EnemyFactory.hpp / .cpp   ← biome probability matrices
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>│   └── Projectile.hpp / .cpp
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>├── managers/
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>│   ├── EntityManager.hpp / .cpp
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>│   ├── LevelManager.hpp / .cpp   ← 150 waves, difficulty curves
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>│   ├── WaveManager.hpp / .cpp
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>│   └── ResourceManager.hpp / .cpp
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>├── skills/
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>│   ├── SkillTree.hpp / .cpp      ← TowerUpgrades, SkillNode, SkillTree
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>│   └── SkillDefinitions.cpp      ← the nodes of the tree
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>├── ui/
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>│   ├── Icon.hpp                  ← enum of icons.png
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>│   ├── Ui.hpp / .cpp             ← pixel font, icons, panels
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>│   ├── Hud.hpp / .cpp
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>│   ├── BuildBar.hpp / .cpp
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>│   ├── TowerPanel.hpp / .cpp
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>│   └── SkillTreeMenu.hpp / .cpp
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>├── map/
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>│   ├── Tile.hpp                  ← TileType, Biome, GridPos
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>│   ├── Map.hpp / .cpp
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>│   ├── Maze.hpp / .cpp           ← perfect maze (recursive backtracker)
+<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>│   ├── MapGenerator.hpp / .cpp
+<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>│   └── MapRenderer.hpp / .cpp
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>└── defender_lib.cpp              ← CMake stub
 </code></pre></div>
 
 
