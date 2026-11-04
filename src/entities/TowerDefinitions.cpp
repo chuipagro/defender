@@ -43,13 +43,13 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .description = "Bulles qui ralentissent de 40%.",
          .projectile = "bubble",
          .rotateProjectile = false,
-         .cost = 80,
+         .cost = 90,
          .damage = 8.f,
          .range = 96.f,
          .fireRate = 1.f,
          .projectileSpeed = 240.f,
-         .upgrades = {{{.gold = 90, .material = Element::Water, .materials = 3},
-                       {.gold = 180, .material = Element::Water, .materials = 8}}},
+         .upgrades = {{{.gold = 300, .material = Element::Water, .materials = 3},
+                       {.gold = 600, .material = Element::Water, .materials = 8}}},
          .onHit = [](Enemy& enemy, const Shot& shot)
          { enemy.applySlow(0.6f, 1.5f * shot.strength); }},
 
@@ -61,8 +61,8 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .range = 96.f,
          .fireRate = 0.9f,
          .projectileSpeed = 260.f,
-         .upgrades = {{{.gold = 100, .material = Element::Fire, .materials = 3},
-                       {.gold = 200, .material = Element::Fire, .materials = 8}}},
+         .upgrades = {{{.gold = 400, .material = Element::Fire, .materials = 3},
+                       {.gold = 800, .material = Element::Fire, .materials = 8}}},
          .onHit = [](Enemy& enemy, const Shot& shot)
          { enemy.applyBurn(6.f * shot.strength, 3.f); }},
 
@@ -76,8 +76,8 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .fireRate = 0.6f,
          .projectileSpeed = 200.f,
          .splash = 40.f,
-         .upgrades = {{{.gold = 110, .material = Element::Earth, .materials = 3},
-                       {.gold = 220, .material = Element::Earth, .materials = 8}}}},
+         .upgrades = {{{.gold = 450, .material = Element::Earth, .materials = 3},
+                       {.gold = 900, .material = Element::Earth, .materials = 8}}}},
 
         {.name = "Tour de vent",
          .description = "Bourrasques qui repoussent les ennemis.",
@@ -87,8 +87,8 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .range = 112.f,
          .fireRate = 1.4f,
          .projectileSpeed = 320.f,
-         .upgrades = {{{.gold = 95, .material = Element::Wind, .materials = 3},
-                       {.gold = 190, .material = Element::Wind, .materials = 8}}},
+         .upgrades = {{{.gold = 500, .material = Element::Wind, .materials = 3},
+                       {.gold = 1000, .material = Element::Wind, .materials = 8}}},
          .onHit = [](Enemy& enemy, const Shot& shot)
          {
              // Big enemies are harder to push.

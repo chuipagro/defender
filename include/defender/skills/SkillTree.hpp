@@ -22,7 +22,7 @@ struct SkillNode
     std::string_view id{};         ///< Unique, used by `prerequisites`
     std::string_view name{};       ///< Shown in the menu
     std::string_view description{};  ///< Shown in the menu
-    int cost = 1;                  ///< Skill points
+    int cost = 4;                  ///< Skill points
     std::vector<std::string_view> prerequisites{};  ///< Ids of the nodes to own first
     int column = 0;                ///< Position in the menu grid
     int row = 0;
