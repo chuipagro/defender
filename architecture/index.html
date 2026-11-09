@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -1488,10 +1488,12 @@ Each layer has its own memory slot (<code>Enemy::MEMORY_SPECIES</code>, <code>ME
 complete while children are waiting to spawn.</p>
 <hr />
 <h2 id="levelmanager-difficulty">LevelManager (difficulty)<a class="headerlink" href="#levelmanager-difficulty" title="Permanent link">&para;</a></h2>
-<p>A level is 150 waves played one after the other:
+<p>The campaign has <code>LEVEL_COUNT</code> (11) levels: level 1 has 50 waves, each next
+level 10 more, up to 150 (<code>levelWaves(level)</code>). Each level is a new map. Waves
+are played one after the other:
 <code>Break (8 s, N / play button to skip) → Running → WaveCompleted → Break → ...</code>
-until wave 150 is cleared (<code>Phase::Victory</code>).</p>
-<p>Each wave gets a <code>WavePlan</code> from <code>planForWave(wave)</code>, built from curves of
+until the last wave is cleared (<code>Phase::Victory</code>, Enter for the next level).</p>
+<p>Each wave gets a <code>WavePlan</code> from <code>planForWave(wave, level)</code>, built from curves of
 <code>{wave, value}</code> points (linear in between) at the top of <code>LevelManager.cpp</code>:</p>
 <table>
 <thead>
@@ -1560,7 +1562,11 @@ until wave 150 is cleared (<code>Phase::Victory</code>).</p>
 <li>Counts per rank are <code>count × share</code>, rounded at random; the strongest enemy closes the wave.</li>
 <li>The elemental factor multiplies the weight of every element but Normal in the
   biome matrix (1 = half of the enemies are elemental).</li>
-<li>Cleared wave: <code>20 + 5 × wave</code> gold, 1 skill point (3 every 10th wave).</li>
+<li>Enemy health is multiplied by the <code>HEALTH</code> curve (×1 at wave 1 → ×25 at
+  wave 150), +10% per level after the first.</li>
+<li>Some enemies are faster (<code>FAST_CHANCE</code>, 5% → 30%, speed ×1.2 to ×1.5).</li>
+<li>From wave 10, enemies can spawn together side by side (<code>GROUP_CHANCE</code>, <code>MAX_GROUP</code>).</li>
+<li>Cleared wave: <code>20 + 5 × wave</code> gold, 1 skill point every 10th wave, +3 for the last wave.</li>
 </ul>
 <hr />
 <h2 id="towers">Towers<a class="headerlink" href="#towers" title="Permanent link">&para;</a></h2>
@@ -1573,7 +1579,7 @@ damage, range, fire rate, projectile sprite, splash, upgrade costs, <code>onHit<
 <th style="text-align: right;">Gold</th>
 <th>Projectile</th>
 <th>Effect</th>
-<th>Upgrades (level 2 / 3)</th>
+<th>Upgrades, gold (level 2 / 3 / 4 / 5)</th>
 </tr>
 </thead>
 <tbody>
@@ -1582,35 +1588,35 @@ damage, range, fire rate, projectile sprite, splash, upgrade costs, <code>onHit<
 <td style="text-align: right;">50</td>
 <td>arrow</td>
 <td>fast shots</td>
-<td>60 / 120 gold</td>
+<td>60 / 120 / 220 / 380</td>
 </tr>
 <tr>
 <td>Water</td>
-<td style="text-align: right;">80</td>
+<td style="text-align: right;">90</td>
 <td>bubble</td>
 <td>slows to 60% speed for 1.5 s</td>
-<td>90 g + 3 / 180 g + 8 water drops</td>
+<td>100 / 200 / 360 / 600</td>
 </tr>
 <tr>
 <td>Fire</td>
 <td style="text-align: right;">90</td>
 <td>fireball</td>
 <td>burns 6 hp/s for 3 s (ignores armor)</td>
-<td>100 g + 3 / 200 g + 8 embers</td>
+<td>110 / 220 / 400 / 680</td>
 </tr>
 <tr>
 <td>Earth</td>
 <td style="text-align: right;">100</td>
 <td>rock</td>
 <td>splash damage (40 px)</td>
-<td>110 g + 3 / 220 g + 8 stones</td>
+<td>120 / 240 / 440 / 750</td>
 </tr>
 <tr>
 <td>Wind</td>
 <td style="text-align: right;">85</td>
 <td>gust</td>
 <td>pushes back 20 px (less for big enemies)</td>
-<td>95 g + 3 / 190 g + 8 feathers</td>
+<td>100 / 200 / 380 / 640</td>
 </tr>
 </tbody>
 </table>
@@ -1626,15 +1632,19 @@ boss / super boss). They fly to their counter in the build bar.</p>
 <hr />
 <h2 id="player">Player<a class="headerlink" href="#player" title="Permanent link">&para;</a></h2>
 <p>Gold (enemy rewards + end-of-wave bonus), elemental materials, health (50), shield (0 until unlocked,
-absorbs damage first, refilled at the end of each wave), skill points.</p>
+absorbs damage first, refilled at the end of each wave). A new player is made for each level.</p>
 <h2 id="skill-tree">Skill tree<a class="headerlink" href="#skill-tree" title="Permanent link">&para;</a></h2>
 <p>Nodes are defined in C++ in <code>src/skills/SkillDefinitions.cpp</code>: cost in skill
 points, prerequisites, position in the menu, icon or tower sprite, and an
-<code>effect(Player&amp;, TowerUpgrades&amp;)</code> run once when bought.</p>
+<code>effect(Player&amp;, TowerUpgrades&amp;)</code>.</p>
+<p>The tree and its points belong to <code>Game</code> and are kept between levels: an
+effect runs when bought, then again on the new player at the start of each
+level (<code>SkillTree::applyTo</code>).</p>
 <ul>
 <li><strong>Towers</strong>: normal tower (owned from the start) → water, fire, earth, wind towers,
   each with <em>Puissance</em> (+25% damage) and <em>Cadence</em> (+20% fire rate).</li>
-<li><strong>Base</strong>: max health, shield, reinforced shield, +25% wave gold.</li>
+<li><strong>Base</strong>: max health, shield, reinforced shield, +25% wave gold, +75 starting
+  gold, +20% gold per kill.</li>
 </ul>
 <p><code>TowerUpgrades</code> (unlocked towers + damage/range/fire-rate multipliers) is what
 the tower system will read.</p>
@@ -1742,7 +1752,7 @@ build mode), right click / Escape = cancel, click a tower = select it.</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── core/
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│   ├── Game.hpp / Game.cpp
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│   ├── StateMachine.hpp          ← std::variant&lt;MenuState, PlayState, ...&gt;
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│   ├── Player.hpp / .cpp         ← gold, health, shield, skill points
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│   ├── Player.hpp / .cpp         ← gold, health, shield
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│   ├── EventBus.hpp              ← template header-only
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│   ├── Events.hpp                ← EnemyKilled, WaveStarted...
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>│   └── Concepts.hpp              ← Updatable, Renderable, Damageable
@@ -1763,7 +1773,7 @@ build mode), right click / Escape = cancel, click a tower = select it.</p>
 <a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>│   └── Projectile.hpp / .cpp
 <a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>├── managers/
 <a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>│   ├── EntityManager.hpp / .cpp
-<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>│   ├── LevelManager.hpp / .cpp   ← 150 waves, difficulty curves
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>│   ├── LevelManager.hpp / .cpp   ← levels, waves, difficulty curves
 <a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>│   ├── WaveManager.hpp / .cpp
 <a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>│   └── ResourceManager.hpp / .cpp
 <a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>├── skills/
@@ -1858,7 +1868,7 @@ build mode), right click / Escape = cancel, click a tower = select it.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>
