@@ -9,10 +9,6 @@ namespace defender
 
 using EntityId = std::uint32_t;
 
-/// Elements shared by enemies and towers. Normal = no element (natural
-/// colors, base stats); the others are stronger and have bonus effects.
-/// Adding one (Ice, Magma, Lightning...) means adding a column to every
-/// row of the spawn table in EnemyFactory.cpp — it will not compile otherwise.
 enum class Element : std::uint8_t
 {
     Normal,

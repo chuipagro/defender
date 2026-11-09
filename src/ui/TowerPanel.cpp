@@ -78,7 +78,6 @@ void TowerPanel::render(sf::RenderTarget& target, const Tower& tower, const Play
     stat(Icon::Target, oneDecimal(stats.range / TILE_SIZE));
     stat(Icon::Bolt, oneDecimal(stats.fireRate) + "/s");
 
-    // Upgrade: gold (+ materials for elemental towers)
     auto button = [&](const sf::FloatRect& box, bool enabled)
     {
         const sf::Color fill = !enabled ? sf::Color(30, 28, 38)
@@ -104,15 +103,6 @@ void TowerPanel::render(sf::RenderTarget& target, const Tower& tower, const Play
         const std::string gold = std::to_string(cost.gold);
         ui::drawText(target, gold, {bx + 18.f, iy + 1.f}, 2.f,
                      player.gold() >= cost.gold ? ui::GOLD : ui::BAD);
-        bx += 18.f + ui::measureText(gold, 2.f).x + 14.f;
-        if (cost.material != Element::Normal && cost.materials > 0)
-        {
-            ui::drawIcon(target, materialIcon(cost.material), {bx, iy}, 1.f);
-            const int owned = player.materials(cost.material);
-            const std::string count = std::to_string(owned) + "/" + std::to_string(cost.materials);
-            ui::drawText(target, count, {bx + 18.f, iy + 1.f}, 2.f,
-                         owned >= cost.materials ? sf::Color::White : ui::BAD);
-        }
     }
 
     // Sell

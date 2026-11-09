@@ -9,10 +9,6 @@
 namespace defender
 {
 
-/// The player's resources: gold, elemental materials, health, shield and skill points.
-///
-/// Damage hits the shield first, then health. The shield refills at the end
-/// of each wave; its maximum is 0 until unlocked in the skill tree.
 class Player
 {
 public:
@@ -51,23 +47,20 @@ public:
     void addMaxShield(float amount);
     void refillShield() { shield_ = maxShield_; }
 
-    // Skill points
-    [[nodiscard]] int skillPoints() const { return skillPoints_; }
-    void addSkillPoints(int amount) { skillPoints_ += amount; }
-    /// Spends `amount` points if possible; returns false otherwise.
-    bool spendSkillPoints(int amount);
-
-    // End of wave
-    /// Multiplier on the end-of-wave gold (1 = no bonus).
+    // Gold bonuses (from the skill tree)
     [[nodiscard]] float waveGoldMultiplier() const { return waveGoldMultiplier_; }
     void addWaveGoldBonus(float fraction) { waveGoldMultiplier_ += fraction; }
-    /// Gives the wave bonus (with the multiplier), the points, refills the shield.
-    /// Returns the gold actually earned.
-    int completeWave(int bonusGold, int skillPoints);
+    [[nodiscard]] float killGoldMultiplier() const { return killGoldMultiplier_; }
+    void addKillGoldBonus(float fraction) { killGoldMultiplier_ += fraction; }
+
+    /// Earns a kill reward (with the multiplier). Returns the gold earned.
+    int earnKill(int reward);
+    /// Earns the wave bonus (with the multiplier) and refills the shield.
+    /// Returns the gold earned.
+    int completeWave(int bonusGold);
 
     static constexpr int STARTING_GOLD = 100;
     static constexpr float STARTING_HEALTH = 50.f;
-    static constexpr int STARTING_SKILL_POINTS = 1;
 
 private:
     int gold_ = STARTING_GOLD;
@@ -76,8 +69,8 @@ private:
     float maxHealth_ = STARTING_HEALTH;
     float shield_ = 0.f;
     float maxShield_ = 0.f;
-    int skillPoints_ = STARTING_SKILL_POINTS;
     float waveGoldMultiplier_ = 1.f;
+    float killGoldMultiplier_ = 1.f;
 };
 
 }  // namespace defender

@@ -5,6 +5,7 @@
 #include "defender/entities/Types.hpp"
 #include "defender/ui/Icon.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <functional>
@@ -34,34 +35,43 @@ struct SkillNode
 /// The game's skill tree (SkillDefinitions.cpp).
 [[nodiscard]] std::span<const SkillNode> skillNodes();
 
-/// Which nodes the player owns, and what they changed.
+/// Owned nodes and skill points. Kept from one level to the next: at the
+/// start of each level, `applyTo` replays every owned node on the new player.
 class SkillTree
 {
 public:
     enum class State
     {
         Locked,     ///< A required node is missing
-        Available,  ///< Can be bought (if the player has the points)
+        Available,  ///< Can be bought (if there are enough points)
         Owned,
     };
 
     /// Free nodes without requirements (cost 0) are owned from the start.
-    explicit SkillTree(Player& player, std::span<const SkillNode> nodes = skillNodes());
+    explicit SkillTree(std::span<const SkillNode> nodes = skillNodes());
 
     [[nodiscard]] State state(std::size_t index) const;
-    [[nodiscard]] bool canBuy(std::size_t index, const Player& player) const;
-    /// Pays the skill points and applies the effect. False if not possible.
+    [[nodiscard]] bool canBuy(std::size_t index) const;
+    /// Pays the points and applies the effect to `player`. False if not possible.
     bool buy(std::size_t index, Player& player);
+    /// Resets the tower bonuses and applies every owned node to `player`.
+    void applyTo(Player& player);
+
+    [[nodiscard]] int points() const { return points_; }
+    void addPoints(int amount) { points_ += std::max(amount, 0); }
 
     [[nodiscard]] std::span<const SkillNode> nodes() const { return nodes_; }
     [[nodiscard]] std::optional<std::size_t> find(std::string_view id) const;
     [[nodiscard]] bool owns(std::string_view id) const;
     [[nodiscard]] const TowerUpgrades& towers() const { return towers_; }
 
+    static constexpr int STARTING_POINTS = 2;
+
 private:
     std::span<const SkillNode> nodes_;
     std::vector<bool> owned_;
     TowerUpgrades towers_;
+    int points_ = STARTING_POINTS;
 };
 
 }  // namespace defender

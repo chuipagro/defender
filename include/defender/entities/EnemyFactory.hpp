@@ -14,18 +14,14 @@
 namespace defender
 {
 
-/// Relative spawn weights for one biome. Weights do not need to sum to
-/// anything, but every one of them must be > 0: no enemy is ever at 0%.
 struct SpawnWeights
 {
-    std::array<double, ELEMENT_COUNT> elements{};    ///< Indexed by Element
-    std::array<double, ENEMY_TYPE_COUNT> types{};    ///< Indexed by EnemyType
+    std::array<double, ELEMENT_COUNT> elements{};
+    std::array<double, ENEMY_TYPE_COUNT> types{};
 };
 
-/// One row of weights per biome, indexed by Biome.
 using SpawnTable = std::array<SpawnWeights, BIOME_COUNT>;
 
-/// The game's probability matrices (see EnemyFactory.cpp).
 const SpawnTable& defaultSpawnTable();
 
 /// Creates enemies at random, following the biome's probability matrices.
@@ -44,14 +40,11 @@ public:
     /// 2 = elemental enemies twice as likely as in the table.
     [[nodiscard]] EnemySpec roll(Rank rank = Rank::Normal, double elementalFactor = 1.0);
 
-    /// Draws a spec and builds the enemy.
     [[nodiscard]] std::unique_ptr<Enemy> create(EntityId id, std::span<const sf::Vector2f> path);
 
-    /// Builds an enemy of a given spec (no randomness). Its stats and hooks
-    /// come from EnemyDefinitions.cpp.
     [[nodiscard]] static std::unique_ptr<Enemy> create(EntityId id, EnemySpec spec,
                                                        std::span<const sf::Vector2f> path,
-                                                       int generation = 0);
+                                                       int generation = 0, EnemyBoost boost = {});
 
     /// Probabilities (0..1) for this factory's biome.
     [[nodiscard]] double probability(Element element) const;

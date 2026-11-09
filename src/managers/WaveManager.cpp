@@ -34,14 +34,9 @@ WaveManager::~WaveManager()
 void WaveManager::startWave(int number, WaveData data)
 {
     currentWave_ = number;
-    total_ = 0;
-    for (const SpawnEntry& entry : data.enemies)
-    {
-        total_ += entry.count;
-    }
+    total_ = static_cast<int>(data.enemies.size());
     spawned_ = 0;
     nextEntry_ = 0;
-    spawnedInEntry_ = 0;
     spawnTimer_ = data.enemies.empty() ? 0.f : data.enemies.front().delay;
     waves_.clear();
     waves_.push_back(std::move(data));
@@ -60,17 +55,13 @@ void WaveManager::update(float dt)
     while (spawnTimer_ <= 0.f && nextEntry_ < wave.enemies.size())
     {
         const SpawnEntry& entry = wave.enemies[nextEntry_];
-        entityManager_.spawnEnemy(EnemyFactory::create(entityManager_.nextId(), entry.spec, path_));
+        auto enemy = EnemyFactory::create(entityManager_.nextId(), entry.spec, path_, 0, entry.boost);
+        enemy->setLane(entry.lane);
+        entityManager_.spawnEnemy(std::move(enemy));
         ++spawned_;
-        spawnTimer_ += wave.spawnInterval;
-        if (++spawnedInEntry_ >= entry.count)
+        if (++nextEntry_ < wave.enemies.size())
         {
-            ++nextEntry_;
-            spawnedInEntry_ = 0;
-            if (nextEntry_ < wave.enemies.size())
-            {
-                spawnTimer_ += wave.enemies[nextEntry_].delay;
-            }
+            spawnTimer_ += wave.enemies[nextEntry_].delay;
         }
     }
 }
@@ -84,7 +75,7 @@ void WaveManager::spawnChild(const Enemy& parent, EnemySpec spec)
 {
     // Queued: we may be inside EntityManager::updateAll, which iterates the enemies.
     pendingChildren_.push_back({spec, parent.pathIndex(), parent.getPosition(),
-                                parent.generation() + 1,
+                                parent.generation() + 1, parent.boost(),
                                 static_cast<float>(childrenOfCurrentParent_) * CHILD_SPACING});
     ++childrenOfCurrentParent_;
 }
@@ -94,7 +85,7 @@ void WaveManager::spawnPendingChildren()
     for (const PendingChild& child : pendingChildren_)
     {
         auto enemy =
-            EnemyFactory::create(entityManager_.nextId(), child.spec, path_, child.generation);
+            EnemyFactory::create(entityManager_.nextId(), child.spec, path_, child.generation, child.boost);
         enemy->placeOnPath(child.pathIndex, child.position);
         enemy->moveBack(child.backOffset);
         entityManager_.spawnEnemy(std::move(enemy));

@@ -18,8 +18,7 @@ enum class TowerAction
     Sell,
 };
 
-/// Panel next to the selected tower: level, stats, upgrade (gold + materials)
-/// and sell buttons. Positions are in screen coordinates.
+/// Panel next to the selected tower: level, stats, upgrade and sell buttons. Positions are in screen coordinates.
 class TowerPanel
 {
 public:

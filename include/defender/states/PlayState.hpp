@@ -26,15 +26,15 @@
 namespace defender
 {
 
-/// A running game on one map: the level's waves, the player, towers, the HUD,
-/// the build bar and the skill tree menu.
+/// One level on one map: its waves, the player, towers, the HUD, the build
+/// bar and the skill tree menu. The skill tree is shared by every level.
 ///
 /// Screen layout, top to bottom: HUD (Hud::HEIGHT), map, build bar (BuildBar::HEIGHT).
 /// Not copyable nor movable: managers keep references to members.
 class PlayState
 {
 public:
-    explicit PlayState(const MapGeneratorConfig& config);
+    PlayState(const MapGeneratorConfig& config, int level, SkillTree& skills);
 
     PlayState(const PlayState&) = delete;
     PlayState& operator=(const PlayState&) = delete;
@@ -52,6 +52,7 @@ public:
     [[nodiscard]] const Player& player() const { return player_; }
     [[nodiscard]] bool isMenuOpen() const { return menuOpen_; }
     [[nodiscard]] bool isOver() const;
+    [[nodiscard]] bool isVictory() const;
     /// True when Escape has something to cancel (menu, tower to place, selection).
     [[nodiscard]] bool capturesEscape() const;
 
@@ -104,7 +105,7 @@ private:
     WaveManager waveManager_;
     LevelManager levelManager_;
     Player player_;
-    SkillTree skillTree_;
+    SkillTree& skillTree_;
     MapRenderer mapRenderer_;
     Hud hud_;
     BuildBar buildBar_;

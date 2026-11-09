@@ -13,41 +13,26 @@
 
 namespace defender
 {
-
-/// Walks along the map path. Its look is the <type> sprite in <element>
-/// colors, drawn bigger for higher ranks.
-///
-/// Stats and behaviors come from EnemyDefinitions.cpp: species + element + rank.
 class Enemy : public Entity
 {
 public:
-    /// `generation` = how many splits led to this enemy (0 for a wave enemy).
-    Enemy(EntityId id, EnemySpec spec, std::span<const sf::Vector2f> path, int generation = 0);
+    Enemy(EntityId id, EnemySpec spec, std::span<const sf::Vector2f> path, int generation = 0,
+          EnemyBoost boost = {});
 
     void update(float dt) override;
     void render(sf::RenderTarget& target) const override;
-
-    /// Applies damage after the onHit hooks (armor, dodge...), unless
-    /// `ignoreHooks` (used by burns). Returns the damage taken.
-    /// Emits EnemyKilled when it dies.
     float takeDamage(float amount, bool ignoreHooks = false);
-    /// Speed x `factor` (e.g. 0.6) for `seconds`. The strongest slow wins.
     void applySlow(float factor, float seconds);
-    /// `damagePerSecond` for `seconds`, ignoring armor. A new burn replaces a weaker one.
     void applyBurn(float damagePerSecond, float seconds);
-    /// Restores health, up to max health.
     void heal(float amount);
-    /// Sets health (clamped to [0, max health]); does not kill.
     void setHealth(float health);
-    /// Runs the onDeath hooks of every layer (called by WaveManager on EnemyKilled).
     void runDeathHooks(EnemySpawner& spawner);
 
-    /// Puts the enemy on the path segment starting at `index`, at `position`.
     void placeOnPath(std::size_t index, sf::Vector2f position);
-    /// Walks `distance` pixels back along the path (stops at the start).
     void moveBack(float distance);
+    /// Sideways offset in pixels from the path center (drawing only).
+    void setLane(float offset) { lane_ = offset; }
 
-    /// True if `point` is on the enemy's body (for clicks).
     [[nodiscard]] bool contains(sf::Vector2f point) const;
 
     [[nodiscard]] sf::Vector2f getPosition() const { return position_; }
@@ -56,6 +41,7 @@ public:
     [[nodiscard]] Element element() const { return spec_.element; }
     [[nodiscard]] Rank rank() const { return spec_.rank; }
     [[nodiscard]] int generation() const { return generation_; }
+    [[nodiscard]] EnemyBoost boost() const { return boost_; }
     [[nodiscard]] std::size_t pathIndex() const { return pathIndex_; }
     [[nodiscard]] std::span<const sf::Vector2f> path() const { return path_; }
 
@@ -65,24 +51,18 @@ public:
     [[nodiscard]] float health() const { return health_; }
     [[nodiscard]] float maxHealth() const { return stats_.health(); }
     [[nodiscard]] float speed() const { return stats_.speed(); }
-    /// Speed with the slow applied.
     [[nodiscard]] float currentSpeed() const;
     [[nodiscard]] bool isSlowed() const { return slowTimer_ > 0.f; }
     [[nodiscard]] bool isBurning() const { return burnTimer_ > 0.f; }
-    /// Pixels walked along the path (towers shoot the most advanced enemy).
     [[nodiscard]] float progress() const { return progress_; }
     [[nodiscard]] int reward() const { return stats_.reward(); }
     [[nodiscard]] float damage() const { return stats_.damage(); }
     [[nodiscard]] float scale() const { return stats_.scale(); }
 
-    /// Free slots for hooks to remember things (all start at 0).
-    /// Each layer has its own slot so they never overwrite each other.
     [[nodiscard]] float& memory(std::size_t slot) { return memory_.at(slot); }
 
-    /// True once it walked to the last point of the path.
     [[nodiscard]] bool hasReachedEnd() const { return reachedEnd_; }
 
-    /// Sprite sheet: 4 frames of 32x32, facing right.
     static constexpr int FRAME_SIZE = 32;
     static constexpr int FRAME_COUNT = 4;
     static constexpr float FRAME_TIME = 0.12f;
@@ -93,12 +73,13 @@ public:
     static constexpr std::size_t MEMORY_EXTRA = 3;
 
 private:
-    /// Species, element and rank hooks, in that order.
     [[nodiscard]] std::array<const EnemyHooks*, 3> layers() const;
     void renderHealthBar(sf::RenderTarget& target) const;
+    [[nodiscard]] sf::Vector2f drawPosition() const;
 
     EnemySpec spec_;
     int generation_;
+    EnemyBoost boost_;
     EnemyStats stats_;
     std::span<const sf::Vector2f> path_;
     std::size_t pathIndex_ = 0;
@@ -113,7 +94,8 @@ private:
     float slowTimer_ = 0.f;
     float burnDps_ = 0.f;
     float burnTimer_ = 0.f;
-    std::string textureId_;  ///< "sprites/enemies/<element>/<type>.png"
+    float lane_ = 0.f;
+    std::string textureId_;
 };
 
 }  // namespace defender

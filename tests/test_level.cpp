@@ -32,7 +32,7 @@ std::array<int, defender::RANK_COUNT> rankCounts(const defender::WaveData& wave)
     std::array<int, defender::RANK_COUNT> counts{};
     for (const auto& entry : wave.enemies)
     {
-        counts[static_cast<std::size_t>(entry.spec.rank)] += entry.count;
+        ++counts[static_cast<std::size_t>(entry.spec.rank)];
     }
     return counts;
 }
@@ -62,7 +62,7 @@ TEST(Difficulty, EnemyCountGoesFrom5To200)
 {
     EXPECT_EQ(planForWave(1).count, 5);
     EXPECT_EQ(planForWave(100).count, 200);
-    for (int wave = 2; wave <= defender::LEVEL_WAVES; ++wave)
+    for (int wave = 2; wave <= defender::levelWaves(defender::LEVEL_COUNT); ++wave)
     {
         EXPECT_GE(planForWave(wave).count, planForWave(wave - 1).count) << "wave " << wave;
     }
@@ -86,7 +86,7 @@ TEST(Difficulty, HardEnemiesGetMoreFrequent)
 {
     for (const Rank rank : {Rank::MiniBoss, Rank::Boss, Rank::SuperBoss})
     {
-        for (int wave = defender::unlockWave(rank) + 1; wave <= defender::LEVEL_WAVES; ++wave)
+        for (int wave = defender::unlockWave(rank) + 1; wave <= defender::levelWaves(defender::LEVEL_COUNT); ++wave)
         {
             EXPECT_GT(share(wave, rank), share(wave - 1, rank)) << "wave " << wave;
         }
@@ -135,7 +135,6 @@ TEST(LevelWaves, CountsMatchThePlanAndStrongestComesLast)
         const auto strongest = std::ranges::max(data.enemies, {}, [](const auto& e)
                                                 { return e.spec.rank; }).spec.rank;
         EXPECT_EQ(data.enemies.back().spec.rank, strongest) << "wave " << wave;
-        EXPECT_FLOAT_EQ(data.spawnInterval, plan.spawnInterval);
     }
 }
 
@@ -176,7 +175,7 @@ TEST(LevelFlow, PlaysWavesOneAfterTheOther)
     EXPECT_EQ(completed[0].waveNumber, 1);
     EXPECT_EQ(completed[1].waveNumber, 2);
     EXPECT_EQ(completed[0].bonusGold, planForWave(1).bonusGold);
-    EXPECT_EQ(completed[0].skillPoints, 1);
+    EXPECT_EQ(completed[0].skillPoints, 0);
     EXPECT_EQ(game.level.phase(), LevelManager::Phase::Break);
     EXPECT_NEAR(game.level.breakRemaining(), LevelManager::BREAK_TIME, 0.1f);
 }
@@ -192,9 +191,50 @@ TEST(LevelFlow, NextWaveCanStartEarly)
     EXPECT_EQ(game.level.wave(), 1);
 }
 
-TEST(LevelFlow, MilestoneWavesGiveMorePoints)
+TEST(LevelFlow, MilestoneWavesGivePoints)
 {
-    EXPECT_EQ(planForWave(9).skillPoints, 1);
-    EXPECT_EQ(planForWave(10).skillPoints, 3);
+    EXPECT_EQ(planForWave(9).skillPoints, 0);
+    EXPECT_EQ(planForWave(10).skillPoints, 1);
+    EXPECT_GT(planForWave(50).skillPoints, planForWave(40).skillPoints) << "level 1 cleared";
     EXPECT_GT(planForWave(50).bonusGold, planForWave(1).bonusGold);
+}
+
+TEST(Levels, EachLevelHasTenMoreWavesUpTo150)
+{
+    EXPECT_EQ(defender::levelWaves(1), 50);
+    EXPECT_EQ(defender::levelWaves(2), 60);
+    EXPECT_EQ(defender::levelWaves(3), 70);
+    EXPECT_EQ(defender::levelWaves(defender::LEVEL_COUNT), 150);
+}
+
+TEST(Difficulty, HealthGrowsWithWavesAndLevels)
+{
+    for (int wave = 2; wave <= 150; ++wave)
+    {
+        EXPECT_GT(planForWave(wave).health, planForWave(wave - 1).health) << "wave " << wave;
+    }
+    EXPECT_GT(planForWave(1, 2).health, planForWave(1, 1).health);
+}
+
+TEST(LevelWaves, EnemiesSpawnTogetherOnlyFromWave10)
+{
+    Level game;
+    auto together = [&game](int wave)
+    {
+        const auto data = game.level.buildWave(planForWave(wave));
+        return std::count_if(data.enemies.begin() + 1, data.enemies.end(),
+                             [](const auto& e) { return e.delay == 0.f; });
+    };
+    EXPECT_EQ(together(9), 0);
+    EXPECT_GT(together(60), 0);
+}
+
+TEST(LevelWaves, SomeEnemiesAreFaster)
+{
+    Level game;
+    const auto data = game.level.buildWave(planForWave(100));
+    const auto fast = std::count_if(data.enemies.begin(), data.enemies.end(),
+                                    [](const auto& e) { return e.boost.speed > 1.f; });
+    EXPECT_GT(fast, 0);
+    EXPECT_LT(fast, static_cast<long>(data.enemies.size()));
 }

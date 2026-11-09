@@ -12,7 +12,6 @@ namespace defender
 
 class Enemy;
 
-/// A price: gold, plus elemental materials for elemental towers.
 struct Cost
 {
     int gold = 0;
@@ -20,7 +19,6 @@ struct Cost
     int materials = 0;
 };
 
-/// Multipliers applied to a tower type by the skill tree (1 = unchanged).
 struct TowerBonus
 {
     float damage = 1.f;
@@ -28,7 +26,6 @@ struct TowerBonus
     float fireRate = 1.f;
 };
 
-/// What the skill tree changed for towers.
 struct TowerUpgrades
 {
     std::array<bool, ELEMENT_COUNT> unlocked{};     ///< Indexed by TowerType
@@ -45,7 +42,6 @@ struct TowerUpgrades
     }
 };
 
-/// What a projectile carries to its target.
 struct Shot
 {
     TowerType type = TowerType::Normal;
@@ -54,7 +50,6 @@ struct Shot
     float strength = 1.f;  ///< Effect power (grows with the tower level)
 };
 
-/// Final stats of a tower (definition x level x skill tree).
 struct TowerStats
 {
     float damage = 0.f;
@@ -65,7 +60,7 @@ struct TowerStats
     float strength = 1.f;
 };
 
-inline constexpr int TOWER_MAX_LEVEL = 3;
+inline constexpr int TOWER_MAX_LEVEL = 5;
 
 /// One tower type. Defined in TowerDefinitions.cpp.
 struct TowerDefinition
@@ -80,22 +75,18 @@ struct TowerDefinition
     float fireRate = 1.f;               ///< Shots per second
     float projectileSpeed = 300.f;
     float splash = 0.f;
-    /// Price of each upgrade: [0] = level 1 -> 2, [1] = level 2 -> 3.
-    std::array<Cost, TOWER_MAX_LEVEL - 1> upgrades{};
+    /// Gold for each upgrade: [0] = level 1 -> 2, [1] = level 2 -> 3...
+    std::array<int, TOWER_MAX_LEVEL - 1> upgrades{};
     /// Effect on each enemy hit (after the damage). Empty = damage only.
     std::function<void(Enemy&, const Shot&)> onHit{};
 };
 
 [[nodiscard]] const TowerDefinition& towerDefinition(TowerType type);
 
-/// Stats of a tower of `type` at `level` (1..TOWER_MAX_LEVEL), with skill bonuses.
 [[nodiscard]] TowerStats towerStats(TowerType type, int level, const TowerUpgrades& upgrades = {});
 
-/// Price to place a tower.
 [[nodiscard]] Cost placeCost(TowerType type);
-/// Price to go from `level` to `level + 1` (gold 0 if already at max level).
 [[nodiscard]] Cost upgradeCost(TowerType type, int level);
-/// Gold given back when selling (60% of the gold spent on it).
 [[nodiscard]] int sellValue(TowerType type, int level);
 
 }  // namespace defender

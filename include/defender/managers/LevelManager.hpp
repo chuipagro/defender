@@ -28,23 +28,30 @@ struct WavePlan
 {
     int wave = 1;
     int count = 5;               ///< Enemies spawned by the wave (children not counted)
-    float spawnInterval = 1.f;   ///< Seconds between two enemies
+    float spawnInterval = 1.f;   ///< Seconds between two groups of enemies
     std::array<float, RANK_COUNT> rankShare{};  ///< Share of the wave per rank (Normal unused)
     float elementalFactor = 1.f; ///< See EnemyFactory::roll
+    float health = 1.f;          ///< Health multiplier of every enemy
+    float fastChance = 0.f;      ///< Chance for an enemy to be faster than normal
+    float groupChance = 0.f;     ///< Chance for an enemy to spawn with the previous one
+    int maxGroup = 1;            ///< Most enemies spawned at the same time
     int bonusGold = 0;           ///< Given when the wave is cleared
     int skillPoints = 0;         ///< Given when the wave is cleared
 };
 
-/// Difficulty of a wave (curves in LevelManager.cpp).
-[[nodiscard]] WavePlan planForWave(int wave);
+/// Difficulty of a wave of a level (curves in LevelManager.cpp).
+[[nodiscard]] WavePlan planForWave(int wave, int level = 1);
 
 /// First wave where each rank can appear.
 [[nodiscard]] int unlockWave(Rank rank);
 
-inline constexpr int LEVEL_WAVES = 150;
+/// Number of waves of a level (1-based).
+[[nodiscard]] int levelWaves(int level);
+
+inline constexpr int LEVEL_COUNT = 11;
 
 /// Plays the waves of a level one after the other: a break, the wave, a
-/// break, the next (harder) wave... until wave LEVEL_WAVES is cleared.
+/// break, the next (harder) wave... until the last wave is cleared.
 ///
 /// Emits WaveCompleted (bonus gold and skill points) at the end of each wave.
 class LevelManager
@@ -57,7 +64,8 @@ public:
         Victory,  ///< The last wave was cleared
     };
 
-    LevelManager(WaveManager& waveManager, EnemyFactory& factory, std::uint32_t seed);
+    LevelManager(WaveManager& waveManager, EnemyFactory& factory, std::uint32_t seed,
+                 int level = 1);
 
     void update(float dt);
     /// Ends the break and starts the next wave right away.
@@ -70,6 +78,8 @@ public:
     [[nodiscard]] Phase phase() const { return phase_; }
     /// Current wave number (0 before the first one).
     [[nodiscard]] int wave() const { return wave_; }
+    [[nodiscard]] int level() const { return level_; }
+    [[nodiscard]] int totalWaves() const { return levelWaves(level_); }
     /// Seconds left before the next wave (during a break).
     [[nodiscard]] float breakRemaining() const { return breakTimer_; }
     [[nodiscard]] const WavePlan& currentPlan() const { return plan_; }
@@ -83,6 +93,7 @@ private:
     WaveManager& waveManager_;
     EnemyFactory& factory_;
     std::mt19937 rng_;
+    int level_;
     Phase phase_ = Phase::Break;
     int wave_ = 0;
     float breakTimer_ = FIRST_BREAK;

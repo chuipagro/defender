@@ -5,16 +5,14 @@
 namespace defender
 {
 
-SkillTree::SkillTree(Player& player, std::span<const SkillNode> nodes)
-    : nodes_(nodes), owned_(nodes.size(), false)
+SkillTree::SkillTree(std::span<const SkillNode> nodes) : nodes_(nodes), owned_(nodes.size(), false)
 {
     for (std::size_t i = 0; i < nodes_.size(); ++i)
     {
-        if (nodes_[i].cost == 0 && nodes_[i].prerequisites.empty())
-        {
-            buy(i, player);
-        }
+        owned_[i] = nodes_[i].cost == 0 && nodes_[i].prerequisites.empty();
     }
+    Player scratch;
+    applyTo(scratch);
 }
 
 std::optional<std::size_t> SkillTree::find(std::string_view id) const
@@ -39,29 +37,41 @@ SkillTree::State SkillTree::state(std::size_t index) const
     {
         return State::Owned;
     }
-    const auto& prerequisites = nodes_[index].prerequisites;
-    const bool ready = std::ranges::all_of(prerequisites,
+    const bool ready = std::ranges::all_of(nodes_[index].prerequisites,
                                            [this](std::string_view id) { return owns(id); });
     return ready ? State::Available : State::Locked;
 }
 
-bool SkillTree::canBuy(std::size_t index, const Player& player) const
+bool SkillTree::canBuy(std::size_t index) const
 {
-    return state(index) == State::Available && player.skillPoints() >= nodes_[index].cost;
+    return state(index) == State::Available && points_ >= nodes_[index].cost;
 }
 
 bool SkillTree::buy(std::size_t index, Player& player)
 {
-    if (!canBuy(index, player) || !player.spendSkillPoints(nodes_[index].cost))
+    if (!canBuy(index))
     {
         return false;
     }
+    points_ -= nodes_[index].cost;
     owned_[index] = true;
     if (nodes_[index].effect)
     {
         nodes_[index].effect(player, towers_);
     }
     return true;
+}
+
+void SkillTree::applyTo(Player& player)
+{
+    towers_ = {};
+    for (std::size_t i = 0; i < nodes_.size(); ++i)
+    {
+        if (owned_[i] && nodes_[i].effect)
+        {
+            nodes_[i].effect(player, towers_);
+        }
+    }
 }
 
 }  // namespace defender

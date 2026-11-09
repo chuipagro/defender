@@ -54,16 +54,14 @@ TEST(Player, DiesAtZeroHealth)
     EXPECT_TRUE(player.isDead());
 }
 
-TEST(Player, WaveEndGivesGoldPointsAndShield)
+TEST(Player, WaveEndGivesGoldAndShield)
 {
     Player player;
     player.addMaxShield(10.f);
     player.takeDamage(10.f);
     player.addWaveGoldBonus(0.5f);
-    const int points = player.skillPoints();
-    EXPECT_EQ(player.completeWave(100, 3), 150);
+    EXPECT_EQ(player.completeWave(100), 150);
     EXPECT_EQ(player.gold(), Player::STARTING_GOLD + 150);
-    EXPECT_EQ(player.skillPoints(), points + 3);
     EXPECT_FLOAT_EQ(player.shield(), 10.f);
 }
 
@@ -80,9 +78,7 @@ TEST(SkillTree, DefinitionsAreConsistent)
         EXPECT_GE(node.cost, 0);
         EXPECT_TRUE(node.effect) << node.id;
     }
-    const Player player;
-    Player copy = player;
-    const SkillTree tree(copy);
+    const SkillTree tree;
     for (const auto& node : defender::skillNodes())
     {
         for (const auto id : node.prerequisites)
@@ -94,18 +90,17 @@ TEST(SkillTree, DefinitionsAreConsistent)
 
 TEST(SkillTree, NormalTowerIsOwnedFromTheStart)
 {
-    Player player;
-    const SkillTree tree(player);
+    const SkillTree tree;
     EXPECT_TRUE(tree.owns("tower.normal"));
     EXPECT_TRUE(tree.towers().isUnlocked(defender::Element::Normal));
     EXPECT_FALSE(tree.towers().isUnlocked(defender::Element::Fire));
-    EXPECT_EQ(player.skillPoints(), Player::STARTING_SKILL_POINTS);
+    EXPECT_EQ(tree.points(), SkillTree::STARTING_POINTS);
 }
 
 TEST(SkillTree, BuyingNeedsPrerequisitesAndPoints)
 {
     Player player;
-    SkillTree tree(player);
+    SkillTree tree;
     const auto fire = *tree.find("tower.fire");
     const auto firePower = *tree.find("fire.power");
     EXPECT_EQ(tree.state(firePower), SkillTree::State::Locked);
@@ -117,9 +112,11 @@ TEST(SkillTree, BuyingNeedsPrerequisitesAndPoints)
     EXPECT_EQ(tree.state(fire), SkillTree::State::Owned);
     EXPECT_FALSE(tree.buy(fire, player)) << "already owned";
 
+    EXPECT_TRUE(tree.buy(*tree.find("tower.water"), player));
+    EXPECT_EQ(tree.points(), 0);
     EXPECT_EQ(tree.state(firePower), SkillTree::State::Available);
     EXPECT_FALSE(tree.buy(firePower, player)) << "no points left";
-    player.addSkillPoints(1);
+    tree.addPoints(1);
     EXPECT_TRUE(tree.buy(firePower, player));
     EXPECT_FLOAT_EQ(tree.towers().of(defender::Element::Fire).damage, 1.25f);
 }
@@ -127,8 +124,8 @@ TEST(SkillTree, BuyingNeedsPrerequisitesAndPoints)
 TEST(SkillTree, BaseBranchUpgradesThePlayer)
 {
     Player player;
-    player.addSkillPoints(10);
-    SkillTree tree(player);
+    SkillTree tree;
+    tree.addPoints(10);
     EXPECT_TRUE(tree.buy(*tree.find("base.walls"), player));
     EXPECT_FLOAT_EQ(player.maxHealth(), Player::STARTING_HEALTH + 15.f);
     EXPECT_TRUE(tree.buy(*tree.find("base.shield"), player));
@@ -136,4 +133,19 @@ TEST(SkillTree, BaseBranchUpgradesThePlayer)
     EXPECT_FLOAT_EQ(player.shield(), 10.f);
     EXPECT_TRUE(tree.buy(*tree.find("base.treasurer"), player));
     EXPECT_FLOAT_EQ(player.waveGoldMultiplier(), 1.25f);
+}
+
+TEST(SkillTree, IsKeptForTheNextLevel)
+{
+    Player first;
+    SkillTree tree;
+    tree.addPoints(10);
+    EXPECT_TRUE(tree.buy(*tree.find("tower.fire"), first));
+    EXPECT_TRUE(tree.buy(*tree.find("base.walls"), first));
+
+    Player next;
+    tree.applyTo(next);
+    EXPECT_TRUE(tree.towers().isUnlocked(defender::Element::Fire));
+    EXPECT_FLOAT_EQ(next.maxHealth(), Player::STARTING_HEALTH + 15.f);
+    EXPECT_FLOAT_EQ(next.health(), next.maxHealth());
 }

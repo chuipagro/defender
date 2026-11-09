@@ -121,7 +121,7 @@ void Tower::render(sf::RenderTarget& target) const
     for (int i = 0; i < level_; ++i)
     {
         sf::RectangleShape pip({4.f, 4.f});
-        pip.setPosition(std::round(position_.x) - 9.f + (static_cast<float>(i) * 7.f),
+        pip.setPosition(std::round(position_.x) - 14.f + (static_cast<float>(i) * 6.f),
                         std::round(position_.y) + 11.f);
         pip.setFillColor(sf::Color(245, 197, 66));
         pip.setOutlineColor(sf::Color(40, 24, 10));

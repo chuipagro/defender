@@ -49,9 +49,13 @@ std::string tilesetId(Biome biome)
 }
 
 /// Message shown when a wave brings something new.
-std::string waveBanner(int wave)
+std::string waveBanner(int wave, int totalWaves, int level)
 {
     std::string text = "Vague " + std::to_string(wave);
+    if (wave == 1)
+    {
+        text = "Niveau " + std::to_string(level) + "\n" + text + "/" + std::to_string(totalWaves);
+    }
     if (wave == unlockWave(Rank::MiniBoss))
     {
         text += "\nLes mini-boss arrivent !";
@@ -64,7 +68,7 @@ std::string waveBanner(int wave)
     {
         text += "\nLes super boss arrivent !";
     }
-    else if (wave == LEVEL_WAVES)
+    else if (wave == totalWaves)
     {
         text += "\nDernière vague !";
     }
@@ -80,20 +84,21 @@ sf::Vector2u PlayState::screenSize(const MapGeneratorConfig& config)
                                   static_cast<int>(BuildBar::HEIGHT))};
 }
 
-PlayState::PlayState(const MapGeneratorConfig& config)
+PlayState::PlayState(const MapGeneratorConfig& config, int level, SkillTree& skills)
     : map_(generateMap(config)),
       path_(pathInPixels(map_)),
       screen_(sf::Vector2f(screenSize(config))),
       enemyFactory_(config.biome, config.seed),
       waveManager_(entityManager_, enemyFactory_, path_),
-      levelManager_(waveManager_, enemyFactory_, config.seed ^ 0x9E3779B9u),
-      skillTree_(player_),
+      levelManager_(waveManager_, enemyFactory_, config.seed ^ 0x9E3779B9u, level),
+      skillTree_(skills),
       hud_(screen_.x),
       buildBar_(screen_.y - BuildBar::HEIGHT, screen_.x),
       towerPanel_({0.f, Hud::HEIGHT, screen_.x, screen_.y - Hud::HEIGHT - BuildBar::HEIGHT}),
       skillMenu_(screen_),
       lootRng_(config.seed ^ 0x51ED270Bu)
 {
+    skillTree_.applyTo(player_);
     mapRenderer_.build(map_, ResourceManager::instance().getTexture(tilesetId(config.biome)));
 
     auto& bus = EventBus::instance();
@@ -108,14 +113,21 @@ PlayState::PlayState(const MapGeneratorConfig& config)
             }
         }));
     handlers_.push_back(bus.subscribe<WaveStarted>(
-        [this](const WaveStarted& event) { showBanner(waveBanner(event.waveNumber)); }));
+        [this](const WaveStarted& event)
+        { showBanner(waveBanner(event.waveNumber, levelManager_.totalWaves(), levelManager_.level())); }));
     handlers_.push_back(bus.subscribe<WaveCompleted>(
         [this](const WaveCompleted& event)
         {
-            const int gold = player_.completeWave(event.bonusGold, event.skillPoints);
-            showBanner("Vague " + std::to_string(event.waveNumber) + " terminée\n+" +
-                       std::to_string(gold) + " or  +" + std::to_string(event.skillPoints) +
-                       (event.skillPoints > 1 ? " points" : " point"));
+            const int gold = player_.completeWave(event.bonusGold);
+            skillTree_.addPoints(event.skillPoints);
+            std::string text = "Vague " + std::to_string(event.waveNumber) + " terminée\n+" +
+                               std::to_string(gold) + " or";
+            if (event.skillPoints > 0)
+            {
+                text += "  +" + std::to_string(event.skillPoints) +
+                        (event.skillPoints > 1 ? " points" : " point");
+            }
+            showBanner(text);
         }));
 }
 
@@ -129,7 +141,7 @@ PlayState::~PlayState()
 
 void PlayState::onEnemyKilled(const Enemy& enemy, int reward)
 {
-    player_.earn(reward);
+    player_.earnKill(reward);
     ++kills_;
     std::uniform_real_distribution<float> unit(0.f, 1.f);
     const int materials = materialDrop(enemy.spec(), unit(lootRng_));
@@ -149,7 +161,12 @@ void PlayState::onEnemyKilled(const Enemy& enemy, int reward)
 
 bool PlayState::isOver() const
 {
-    return player_.isDead() || levelManager_.phase() == LevelManager::Phase::Victory;
+    return player_.isDead() || isVictory();
+}
+
+bool PlayState::isVictory() const
+{
+    return !player_.isDead() && levelManager_.phase() == LevelManager::Phase::Victory;
 }
 
 bool PlayState::capturesEscape() const
@@ -437,8 +454,10 @@ void PlayState::render(sf::RenderTarget& target)
     target.setView(defaultView);
 
     hud_.render(target, HudInfo{.player = player_,
+                                .skillPoints = skillTree_.points(),
+                                .level = levelManager_.level(),
                                 .wave = levelManager_.wave(),
-                                .totalWaves = LEVEL_WAVES,
+                                .totalWaves = levelManager_.totalWaves(),
                                 .remainingEnemies = waveManager_.remainingEnemies(),
                                 .phase = levelManager_.phase(),
                                 .breakRemaining = levelManager_.breakRemaining(),
@@ -459,7 +478,7 @@ void PlayState::render(sf::RenderTarget& target)
     }
     if (menuOpen_)
     {
-        skillMenu_.render(target, skillTree_, player_, mouse_);
+        skillMenu_.render(target, skillTree_, mouse_);
     }
     if (isOver())
     {
@@ -546,14 +565,19 @@ void PlayState::renderBanner(sf::RenderTarget& target) const
 void PlayState::renderEndScreen(sf::RenderTarget& target) const
 {
     ui::drawPanel(target, {0.f, 0.f, screen_.x, screen_.y}, sf::Color(0, 0, 0, 160));
-    const bool victory = !player_.isDead();
-    const std::string title = victory ? "Victoire !" : "Partie perdue";
+    const bool victory = isVictory();
+    const bool lastLevel = levelManager_.level() >= LEVEL_COUNT;
+    const std::string title = !victory   ? "Partie perdue"
+                              : lastLevel ? "Campagne terminée !"
+                                          : "Niveau " + std::to_string(levelManager_.level()) + " terminé !";
     const std::string details = "Vague " + std::to_string(levelManager_.wave()) + "/" +
-                                std::to_string(LEVEL_WAVES) + "   " + std::to_string(kills_) +
-                                " ennemis vaincus";
-    const std::string hint = "[R] nouvelle partie   [Echap] quitter";
+                                std::to_string(levelManager_.totalWaves()) + "   " +
+                                std::to_string(kills_) + " ennemis vaincus";
+    const std::string hint = victory && !lastLevel ? "[Entrée] niveau suivant   [R] rejouer   [Echap] quitter"
+                                                   : "[R] réessayer   [Echap] quitter";
 
-    const sf::FloatRect box((screen_.x - 520.f) / 2.f, (screen_.y - 180.f) / 2.f, 520.f, 180.f);
+    const float width = std::max(520.f, ui::measureText(hint, 2.f).x + 40.f);
+    const sf::FloatRect box((screen_.x - width) / 2.f, (screen_.y - 180.f) / 2.f, width, 180.f);
     ui::drawPanel(target, box, ui::PANEL, victory ? ui::GOLD : ui::BAD, 3.f);
     auto centered = [&](const std::string& text, float y, float scale, sf::Color color)
     {
@@ -569,7 +593,7 @@ std::string PlayState::status() const
 {
     return "Defender - " + std::string(biomeName(map_.biome())) +
            "   [1-5] tours  [U] améliorer  [T] compétences  [N] vague suivante  [Espace] x3  "
-           "[R] nouvelle carte  [F1-F4] biome";
+           "[R] rejouer le niveau  [F1-F4] biome";
 }
 
 }  // namespace defender

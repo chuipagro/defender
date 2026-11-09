@@ -17,14 +17,14 @@ namespace defender
 struct SpawnEntry
 {
     EnemySpec spec;
-    int count = 1;
-    float delay = 0.f;  ///< Seconds before this entry starts
+    EnemyBoost boost{};
+    float delay = 0.f;  ///< Seconds after the previous enemy (0 = at the same time)
+    float lane = 0.f;   ///< Sideways offset, to spread enemies spawned together
 };
 
 struct WaveData
 {
     std::vector<SpawnEntry> enemies;
-    float spawnInterval = 1.f;  ///< Seconds between two enemies
 };
 
 /// Spawns the enemies of one wave over time (LevelManager decides what is in it).
@@ -76,6 +76,7 @@ private:
         std::size_t pathIndex;
         sf::Vector2f position;
         int generation;
+        EnemyBoost boost;
         float backOffset;
     };
 
@@ -86,8 +87,7 @@ private:
     std::vector<PendingChild> pendingChildren_;
     float spawnTimer_ = 0.f;
     int currentWave_ = 0;
-    std::size_t nextEntry_ = 0;  ///< Entry of the current wave being spawned
-    int spawnedInEntry_ = 0;
+    std::size_t nextEntry_ = 0;
     int spawned_ = 0;
     int total_ = 0;
     EntityManager& entityManager_;

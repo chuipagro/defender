@@ -304,11 +304,13 @@ complete while children are waiting to spawn.
 
 ## LevelManager (difficulty)
 
-A level is 150 waves played one after the other:
+The campaign has `LEVEL_COUNT` (11) levels: level 1 has 50 waves, each next
+level 10 more, up to 150 (`levelWaves(level)`). Each level is a new map. Waves
+are played one after the other:
 `Break (8 s, N / play button to skip) → Running → WaveCompleted → Break → ...`
-until wave 150 is cleared (`Phase::Victory`).
+until the last wave is cleared (`Phase::Victory`, Enter for the next level).
 
-Each wave gets a `WavePlan` from `planForWave(wave)`, built from curves of
+Each wave gets a `WavePlan` from `planForWave(wave, level)`, built from curves of
 `{wave, value}` points (linear in between) at the top of `LevelManager.cpp`:
 
 | Wave | Enemies | Mini-boss | Boss | Super boss | Elemental factor |
@@ -324,7 +326,11 @@ Each wave gets a `WavePlan` from `planForWave(wave)`, built from curves of
 - Counts per rank are `count × share`, rounded at random; the strongest enemy closes the wave.
 - The elemental factor multiplies the weight of every element but Normal in the
   biome matrix (1 = half of the enemies are elemental).
-- Cleared wave: `20 + 5 × wave` gold, 1 skill point (3 every 10th wave).
+- Enemy health is multiplied by the `HEALTH` curve (×1 at wave 1 → ×25 at
+  wave 150), +10% per level after the first.
+- Some enemies are faster (`FAST_CHANCE`, 5% → 30%, speed ×1.2 to ×1.5).
+- From wave 10, enemies can spawn together side by side (`GROUP_CHANCE`, `MAX_GROUP`).
+- Cleared wave: `20 + 5 × wave` gold, 1 skill point every 10th wave, +3 for the last wave.
 
 ---
 
@@ -333,13 +339,13 @@ Each wave gets a `WavePlan` from `planForWave(wave)`, built from curves of
 Defined in C++ in `src/entities/TowerDefinitions.cpp` (`TowerDefinition`: price,
 damage, range, fire rate, projectile sprite, splash, upgrade costs, `onHit` effect).
 
-| Tower  | Gold | Projectile | Effect | Upgrades (level 2 / 3) |
+| Tower  | Gold | Projectile | Effect | Upgrades, gold (level 2 / 3 / 4 / 5) |
 |--------|-----:|------------|--------|------------------------|
-| Normal |   50 | arrow      | fast shots | 60 / 120 gold |
-| Water  |   80 | bubble     | slows to 60% speed for 1.5 s | 90 g + 3 / 180 g + 8 water drops |
-| Fire   |   90 | fireball   | burns 6 hp/s for 3 s (ignores armor) | 100 g + 3 / 200 g + 8 embers |
-| Earth  |  100 | rock       | splash damage (40 px) | 110 g + 3 / 220 g + 8 stones |
-| Wind   |   85 | gust       | pushes back 20 px (less for big enemies) | 95 g + 3 / 190 g + 8 feathers |
+| Normal |   50 | arrow      | fast shots | 60 / 120 / 220 / 380 |
+| Water  |   90 | bubble     | slows to 60% speed for 1.5 s | 100 / 200 / 360 / 600 |
+| Fire   |   90 | fireball   | burns 6 hp/s for 3 s (ignores armor) | 110 / 220 / 400 / 680 |
+| Earth  |  100 | rock       | splash damage (40 px) | 120 / 240 / 440 / 750 |
+| Wind   |   85 | gust       | pushes back 20 px (less for big enemies) | 100 / 200 / 380 / 640 |
 
 Each level: damage +50%, range +10%, fire rate +15%, effects +25%. Skill tree
 bonuses (`TowerUpgrades`) multiply on top. Selling gives back 60% of the gold spent.
@@ -358,17 +364,22 @@ boss / super boss). They fly to their counter in the build bar.
 ## Player
 
 Gold (enemy rewards + end-of-wave bonus), elemental materials, health (50), shield (0 until unlocked,
-absorbs damage first, refilled at the end of each wave), skill points.
+absorbs damage first, refilled at the end of each wave). A new player is made for each level.
 
 ## Skill tree
 
 Nodes are defined in C++ in `src/skills/SkillDefinitions.cpp`: cost in skill
 points, prerequisites, position in the menu, icon or tower sprite, and an
-`effect(Player&, TowerUpgrades&)` run once when bought.
+`effect(Player&, TowerUpgrades&)`.
+
+The tree and its points belong to `Game` and are kept between levels: an
+effect runs when bought, then again on the new player at the start of each
+level (`SkillTree::applyTo`).
 
 - **Towers**: normal tower (owned from the start) → water, fire, earth, wind towers,
   each with *Puissance* (+25% damage) and *Cadence* (+20% fire rate).
-- **Base**: max health, shield, reinforced shield, +25% wave gold.
+- **Base**: max health, shield, reinforced shield, +25% wave gold, +75 starting
+  gold, +20% gold per kill.
 
 `TowerUpgrades` (unlocked towers + damage/range/fire-rate multipliers) is what
 the tower system will read.
@@ -502,7 +513,7 @@ src/
 ├── core/
 │   ├── Game.hpp / Game.cpp
 │   ├── StateMachine.hpp          ← std::variant<MenuState, PlayState, ...>
-│   ├── Player.hpp / .cpp         ← gold, health, shield, skill points
+│   ├── Player.hpp / .cpp         ← gold, health, shield
 │   ├── EventBus.hpp              ← template header-only
 │   ├── Events.hpp                ← EnemyKilled, WaveStarted...
 │   └── Concepts.hpp              ← Updatable, Renderable, Damageable
@@ -523,7 +534,7 @@ src/
 │   └── Projectile.hpp / .cpp
 ├── managers/
 │   ├── EntityManager.hpp / .cpp
-│   ├── LevelManager.hpp / .cpp   ← 150 waves, difficulty curves
+│   ├── LevelManager.hpp / .cpp   ← levels, waves, difficulty curves
 │   ├── WaveManager.hpp / .cpp
 │   └── ResourceManager.hpp / .cpp
 ├── skills/

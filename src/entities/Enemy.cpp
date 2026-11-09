@@ -45,10 +45,12 @@ sf::Color healthBarColor(Rank rank)
 
 }  // namespace
 
-Enemy::Enemy(EntityId id, EnemySpec spec, std::span<const sf::Vector2f> path, int generation)
+Enemy::Enemy(EntityId id, EnemySpec spec, std::span<const sf::Vector2f> path, int generation,
+             EnemyBoost boost)
     : Entity(id),
       spec_(spec),
       generation_(generation),
+      boost_(boost),
       stats_(computeStats(spec)),
       path_(path),
       position_(path.empty() ? sf::Vector2f{} : path.front()),
@@ -56,6 +58,9 @@ Enemy::Enemy(EntityId id, EnemySpec spec, std::span<const sf::Vector2f> path, in
       textureId_("sprites/enemies/" + std::string(elementName(spec.element)) + "/" +
                  std::string(enemyTypeName(spec.type)) + ".png")
 {
+    stats_[Stat::Health] *= boost.health;
+    stats_[Stat::Speed] *= boost.speed;
+    health_ = stats_.health();
     for (const EnemyHooks* hooks : layers())
     {
         if (hooks->onSpawn)
@@ -265,11 +270,26 @@ void Enemy::moveBack(float distance)
     }
 }
 
+sf::Vector2f Enemy::drawPosition() const
+{
+    if (lane_ == 0.f || pathIndex_ + 1 >= path_.size())
+    {
+        return position_;
+    }
+    const sf::Vector2f direction = path_[pathIndex_ + 1] - path_[pathIndex_];
+    const float size = length(direction);
+    if (size == 0.f)
+    {
+        return position_;
+    }
+    return position_ + (sf::Vector2f(-direction.y, direction.x) * (lane_ / size));
+}
+
 bool Enemy::contains(sf::Vector2f point) const
 {
     // The body is roughly a circle above the feet.
     const float radius = 12.f * scale();
-    const sf::Vector2f center = position_ - sf::Vector2f(0.f, 8.f * scale());
+    const sf::Vector2f center = drawPosition() - sf::Vector2f(0.f, 8.f * scale());
     return length(point - center) <= radius;
 }
 
@@ -282,7 +302,8 @@ void Enemy::render(sf::RenderTarget& target) const
     sprite.setOrigin(FRAME_SIZE / 2.f, 24.f);
     sprite.setScale(facingLeft_ ? -scale() : scale(), scale());
     // Whole pixels keep the pixel art crisp.
-    sprite.setPosition(std::round(position_.x), std::round(position_.y));
+    const sf::Vector2f at = drawPosition();
+    sprite.setPosition(std::round(at.x), std::round(at.y));
     if (burnTimer_ > 0.f)
     {
         sprite.setColor(sf::Color(255, 170, 120));
@@ -302,8 +323,8 @@ void Enemy::render(sf::RenderTarget& target) const
 void Enemy::renderHealthBar(sf::RenderTarget& target) const
 {
     const float width = std::round(20.f * scale());
-    const sf::Vector2f topLeft(std::round(position_.x - (width / 2.f)),
-                               std::round(position_.y - (26.f * scale())));
+    const sf::Vector2f at = drawPosition();
+    const sf::Vector2f topLeft(std::round(at.x - (width / 2.f)), std::round(at.y - (26.f * scale())));
 
     sf::RectangleShape back({width + 2.f, 4.f});
     back.setPosition(topLeft - sf::Vector2f(1.f, 1.f));

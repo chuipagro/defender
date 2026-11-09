@@ -63,7 +63,7 @@ bool SkillTreeMenu::click(sf::Vector2f point, SkillTree& tree, Player& player)
     return false;
 }
 
-void SkillTreeMenu::render(sf::RenderTarget& target, const SkillTree& tree, const Player& player,
+void SkillTreeMenu::render(sf::RenderTarget& target, const SkillTree& tree,
                            sf::Vector2f mouse) const
 {
     const auto size = target.getView().getSize();
@@ -73,7 +73,7 @@ void SkillTreeMenu::render(sf::RenderTarget& target, const SkillTree& tree, cons
     // Title, points, close button
     ui::drawText(target, "Arbre de compétences", {panel_.left + 16.f, panel_.top + 16.f}, 3.f,
                  ui::GOLD);
-    const std::string points = std::to_string(player.skillPoints());
+    const std::string points = std::to_string(tree.points());
     const float pointsX = closeButton_.left - 16.f - ui::measureText(points, 3.f).x;
     ui::drawText(target, points, {pointsX, panel_.top + 16.f}, 3.f, ui::GOLD);
     ui::drawIcon(target, Icon::Star, {pointsX - 38.f, panel_.top + 12.f}, 2.f);
@@ -120,7 +120,7 @@ void SkillTreeMenu::render(sf::RenderTarget& target, const SkillTree& tree, cons
         const SkillNode& node = nodes[i];
         const sf::FloatRect box = nodeBox(node);
         const auto state = tree.state(i);
-        const bool affordable = tree.canBuy(i, player);
+        const bool affordable = tree.canBuy(i);
         const bool hover = hovered == i;
 
         sf::Color fill = state == SkillTree::State::Locked ? LOCKED_FILL : sf::Color(40, 36, 54);
@@ -163,7 +163,7 @@ void SkillTreeMenu::render(sf::RenderTarget& target, const SkillTree& tree, cons
             const float x = box.left + ((box.width - width) / 2.f);
             ui::drawIcon(target, Icon::Star, {x, box.top + box.height + 4.f}, 1.f);
             ui::drawText(target, cost, {x + 18.f, box.top + box.height + 5.f}, 2.f,
-                         player.skillPoints() >= node.cost ? ui::GOLD : ui::TEXT_DIM);
+                         tree.points() >= node.cost ? ui::GOLD : ui::TEXT_DIM);
         }
     }
 
@@ -200,7 +200,7 @@ void SkillTreeMenu::render(sf::RenderTarget& target, const SkillTree& tree, cons
             statusColor = ui::GOLD;
             break;
         case SkillTree::State::Available:
-            if (tree.canBuy(*hovered, player))
+            if (tree.canBuy(*hovered))
             {
                 status = "Cliquer pour acheter";
                 statusColor = ui::GOOD;

@@ -50,8 +50,12 @@ void Hud::render(sf::RenderTarget& target, const HudInfo& info)
              hasShield ? sf::Color::White : ui::TEXT_DIM,
              hasShield ? sf::Color::White : sf::Color(110, 110, 120));
     x = item(target, x, Icon::Coin, std::to_string(player.gold()), ui::GOLD);
-    x = item(target, x, Icon::Star, std::to_string(player.skillPoints()),
-             player.skillPoints() > 0 ? ui::GOLD : ui::TEXT_DIM);
+    x = item(target, x, Icon::Star, std::to_string(info.skillPoints),
+             info.skillPoints > 0 ? ui::GOLD : ui::TEXT_DIM);
+    const std::string level = "Niv." + std::to_string(info.level);
+    ui::drawText(target, level, {x, (HEIGHT - ui::measureText(level, TEXT_SCALE).y) / 2.f},
+                 TEXT_SCALE, ui::GOLD);
+    x += ui::measureText(level, TEXT_SCALE).x + GAP;
     x = item(target, x, Icon::Flag,
              std::to_string(info.wave) + "/" + std::to_string(info.totalWaves), sf::Color::White);
     item(target, x, Icon::Paw, std::to_string(info.remainingEnemies), sf::Color::White);
@@ -78,7 +82,7 @@ void Hud::render(sf::RenderTarget& target, const HudInfo& info)
                      ICON_SCALE, tint);
     };
 
-    centeredIcon(Icon::Tree, button(HudButton::SkillTree, 40.f, player.skillPoints() > 0));
+    centeredIcon(Icon::Tree, button(HudButton::SkillTree, 40.f, info.skillPoints > 0));
     centeredIcon(Icon::FastForward, button(HudButton::Speed, 40.f, info.fastForward),
                  info.fastForward ? ui::GOLD : sf::Color::White);
 

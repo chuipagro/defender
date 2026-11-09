@@ -7,7 +7,6 @@
 namespace defender
 {
 
-/// Lightweight base of every game object.
 class Entity
 {
 public:

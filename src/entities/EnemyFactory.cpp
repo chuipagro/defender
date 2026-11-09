@@ -125,9 +125,10 @@ std::unique_ptr<Enemy> EnemyFactory::create(EntityId id, std::span<const sf::Vec
 }
 
 std::unique_ptr<Enemy> EnemyFactory::create(EntityId id, EnemySpec spec,
-                                            std::span<const sf::Vector2f> path, int generation)
+                                            std::span<const sf::Vector2f> path, int generation,
+                                            EnemyBoost boost)
 {
-    return std::make_unique<Enemy>(id, spec, path, generation);
+    return std::make_unique<Enemy>(id, spec, path, generation, boost);
 }
 
 double EnemyFactory::probability(Element element) const

@@ -24,8 +24,10 @@ enum class HudButton
 struct HudInfo
 {
     const Player& player;
+    int skillPoints = 0;
+    int level = 1;
     int wave = 0;
-    int totalWaves = LEVEL_WAVES;
+    int totalWaves = 0;
     int remainingEnemies = 0;
     LevelManager::Phase phase = LevelManager::Phase::Break;
     float breakRemaining = 0.f;
@@ -33,7 +35,7 @@ struct HudInfo
     sf::Vector2f mouse;
 };
 
-/// Top bar: health, shield, gold, skill points, wave, enemies left, and
+/// Top bar: health, shield, gold, skill points, level, wave, enemies left, and
 /// buttons (next wave, speed, skill tree).
 class Hud
 {

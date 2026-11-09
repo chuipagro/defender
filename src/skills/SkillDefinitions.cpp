@@ -7,7 +7,9 @@ namespace defender
 //  Skill tree — edit this file to add nodes.
 //
 //  A node costs skill points, needs its prerequisites, and runs its effect
-//  once when bought. (column, row) place it in the menu (columns 0-9, rows 0-3).
+//  when bought, then again at the start of every level (the tree is kept
+//  between levels, the player is not). (column, row) place it in the menu
+//  (columns 0-9, rows 0-3).
 //  Texts are shown in game: lowercase accents are fine, uppercase ones are not
 //  in the pixel font.
 // ═════════════════════════════════════════════════════════════════════════════
@@ -143,6 +145,24 @@ std::vector<SkillNode> buildTree()
                      .icon = Icon::Coin,
                      .effect = [](Player& player, TowerUpgrades&)
                      { player.addWaveGoldBonus(0.25f); }});
+    nodes.push_back({.id = "base.savings",
+                     .name = "Economies",
+                     .description = "+75 or au début de chaque niveau.",
+                     .cost = 1,
+                     .column = 9,
+                     .row = 0,
+                     .icon = Icon::Coin,
+                     .effect = [](Player& player, TowerUpgrades&) { player.earn(75); }});
+    nodes.push_back({.id = "base.bounty",
+                     .name = "Chasseur de primes",
+                     .description = "+20% d'or par ennemi vaincu.",
+                     .cost = 3,
+                     .prerequisites = {"base.treasurer"},
+                     .column = 9,
+                     .row = 2,
+                     .icon = Icon::Coin,
+                     .effect = [](Player& player, TowerUpgrades&)
+                     { player.addKillGoldBonus(0.2f); }});
     return nodes;
 }
 

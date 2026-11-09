@@ -83,20 +83,21 @@ TEST(TowerDefinitions, PlacingCostsGoldOnly)
     }
 }
 
-TEST(TowerDefinitions, ElementalUpgradesNeedTheirMaterial)
+TEST(TowerDefinitions, UpgradesCostGoldOnlyUpToLevel5)
 {
-    for (int level = 1; level < defender::TOWER_MAX_LEVEL; ++level)
+    EXPECT_EQ(defender::TOWER_MAX_LEVEL, 5);
+    for (const TowerType type : {TowerType::Normal, TowerType::Water, TowerType::Fire,
+                                 TowerType::Earth, TowerType::Wind})
     {
-        const auto normal = defender::upgradeCost(TowerType::Normal, level);
-        EXPECT_GT(normal.gold, 0);
-        EXPECT_EQ(normal.materials, 0) << "normal towers upgrade with gold only";
-        for (const TowerType type : {TowerType::Water, TowerType::Fire, TowerType::Earth,
-                                     TowerType::Wind})
+        for (int level = 1; level < defender::TOWER_MAX_LEVEL; ++level)
         {
             const auto cost = defender::upgradeCost(type, level);
             EXPECT_GT(cost.gold, 0);
-            EXPECT_EQ(cost.material, type);
-            EXPECT_GT(cost.materials, 0);
+            EXPECT_EQ(cost.materials, 0);
+            if (level > 1)
+            {
+                EXPECT_GT(cost.gold, defender::upgradeCost(type, level - 1).gold);
+            }
         }
     }
     EXPECT_EQ(defender::upgradeCost(TowerType::Fire, defender::TOWER_MAX_LEVEL).gold, 0);
@@ -120,17 +121,15 @@ TEST(Materials, OnlyElementalEnemiesDropThem)
               defender::materialDrop({EnemyType::Cat, Element::Water, Rank::MiniBoss}, 0.9f));
 }
 
-TEST(Materials, UpgradeCostsAreChecked)
+TEST(TowerDefinitions, UpgradeCostsAreChecked)
 {
     defender::Player player;
-    player.earn(1000);
+    EXPECT_TRUE(player.spend(player.gold()));
     const auto cost = defender::upgradeCost(TowerType::Water, 1);
-    EXPECT_FALSE(player.canAfford(cost));
     EXPECT_FALSE(player.pay(cost));
-    player.addMaterials(Element::Water, cost.materials);
+    player.earn(cost.gold);
     EXPECT_TRUE(player.pay(cost));
-    EXPECT_EQ(player.materials(Element::Water), 0);
-    EXPECT_EQ(player.gold(), defender::Player::STARTING_GOLD + 1000 - cost.gold);
+    EXPECT_EQ(player.gold(), 0);
 }
 
 // ── Targeting and shooting ────────────────────────────────────────────────────
@@ -238,8 +237,10 @@ TEST(TowerPlacement, UpgradeStopsAtMaxLevel)
 {
     defender::EntityManager entities;
     auto& tower = towerNextToRoad(entities, TowerType::Fire, 4);
-    EXPECT_TRUE(tower.upgrade({}));
-    EXPECT_TRUE(tower.upgrade({}));
+    for (int level = 1; level < defender::TOWER_MAX_LEVEL; ++level)
+    {
+        EXPECT_TRUE(tower.upgrade({}));
+    }
     EXPECT_EQ(tower.level(), defender::TOWER_MAX_LEVEL);
     EXPECT_FALSE(tower.upgrade({}));
 }

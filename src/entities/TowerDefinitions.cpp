@@ -10,10 +10,8 @@ namespace defender
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Tower definitions — edit this file to balance towers.
-//
-//  Placing costs gold only. Upgrading a normal tower costs gold; upgrading an
-//  elemental tower costs gold + materials of its element (dropped by enemies
-//  of that element).
+//  Placing and upgrading cost gold only. New tower types are unlocked in the
+//  skill tree.
 // ═════════════════════════════════════════════════════════════════════════════
 
 namespace
@@ -37,7 +35,7 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .range = 96.f,
          .fireRate = 1.2f,
          .projectileSpeed = 360.f,
-         .upgrades = {{{.gold = 60}, {.gold = 120}}}},
+         .upgrades = {60, 120, 220, 380}},
 
         {.name = "Tour d'eau",
          .description = "Bulles qui ralentissent de 40%.",
@@ -48,8 +46,7 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .range = 96.f,
          .fireRate = 1.f,
          .projectileSpeed = 240.f,
-         .upgrades = {{{.gold = 300, .material = Element::Water, .materials = 3},
-                       {.gold = 600, .material = Element::Water, .materials = 8}}},
+         .upgrades = {100, 200, 360, 600},
          .onHit = [](Enemy& enemy, const Shot& shot)
          { enemy.applySlow(0.6f, 1.5f * shot.strength); }},
 
@@ -61,8 +58,7 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .range = 96.f,
          .fireRate = 0.9f,
          .projectileSpeed = 260.f,
-         .upgrades = {{{.gold = 400, .material = Element::Fire, .materials = 3},
-                       {.gold = 800, .material = Element::Fire, .materials = 8}}},
+         .upgrades = {110, 220, 400, 680},
          .onHit = [](Enemy& enemy, const Shot& shot)
          { enemy.applyBurn(6.f * shot.strength, 3.f); }},
 
@@ -76,8 +72,7 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .fireRate = 0.6f,
          .projectileSpeed = 200.f,
          .splash = 40.f,
-         .upgrades = {{{.gold = 450, .material = Element::Earth, .materials = 3},
-                       {.gold = 900, .material = Element::Earth, .materials = 8}}}},
+         .upgrades = {120, 240, 440, 750}},
 
         {.name = "Tour de vent",
          .description = "Bourrasques qui repoussent les ennemis.",
@@ -87,8 +82,7 @@ const std::array<TowerDefinition, ELEMENT_COUNT>& towerTable()
          .range = 112.f,
          .fireRate = 1.4f,
          .projectileSpeed = 320.f,
-         .upgrades = {{{.gold = 500, .material = Element::Wind, .materials = 3},
-                       {.gold = 1000, .material = Element::Wind, .materials = 8}}},
+         .upgrades = {100, 200, 380, 640},
          .onHit = [](Enemy& enemy, const Shot& shot)
          {
              // Big enemies are harder to push.
@@ -129,7 +123,7 @@ Cost upgradeCost(TowerType type, int level)
     {
         return {};
     }
-    return towerDefinition(type).upgrades[static_cast<std::size_t>(level - 1)];
+    return {.gold = towerDefinition(type).upgrades[static_cast<std::size_t>(level - 1)]};
 }
 
 int sellValue(TowerType type, int level)

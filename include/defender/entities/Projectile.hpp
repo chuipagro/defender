@@ -11,12 +11,6 @@
 
 namespace defender
 {
-
-/// Flies toward its target (following it). If the target dies on the way,
-/// it ends its flight where the target was.
-///
-/// When it arrives, hasImpact() becomes true: EntityManager then applies the
-/// shot (damage, splash, tower effect) and removes it.
 class Projectile : public Entity
 {
 public:
@@ -27,12 +21,10 @@ public:
     void render(sf::RenderTarget& target) const override;
 
     [[nodiscard]] bool hasImpact() const { return impact_; }
-    /// Marks the impact as handled (the projectile disappears).
     void consume() { alive_ = false; }
 
     [[nodiscard]] sf::Vector2f getPosition() const { return position_; }
     [[nodiscard]] const Shot& shot() const { return shot_; }
-    /// The target, or null if it died or vanished.
     [[nodiscard]] std::shared_ptr<Enemy> target() const;
 
     static constexpr int FRAME_SIZE = 16;
@@ -45,7 +37,7 @@ private:
     sf::Vector2f lastTargetPosition_;
     Shot shot_;
     float speed_;
-    float angle_ = 0.f;  ///< Degrees, for rotating sprites
+    float angle_ = 0.f;
     float animationTime_ = 0.f;
     bool impact_ = false;
     std::string textureId_;

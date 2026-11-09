@@ -85,10 +85,10 @@ namespace
 defender::WaveData wavePlan(int count, float interval)
 {
     defender::WaveData data;
-    data.spawnInterval = interval;
     for (int i = 0; i < count; ++i)
     {
-        data.enemies.push_back({{EnemyType::Cat, Element::Normal}, 1, 0.f});
+        data.enemies.push_back({.spec = {EnemyType::Cat, Element::Normal},
+                                .delay = i == 0 ? 0.f : interval});
     }
     return data;
 }

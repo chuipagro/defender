@@ -46,20 +46,49 @@ constexpr std::array<CurvePoint, 5> ELEMENTAL_FACTOR = {{
     {1, 0.2f}, {25, 0.45f}, {50, 0.8f}, {100, 1.5f}, {150, 3.f},
 }};
 
+/// Health multiplier of every enemy (on top of its rank and element).
+constexpr std::array<CurvePoint, 6> HEALTH = {{
+    {1, 1.f}, {10, 1.5f}, {25, 2.5f}, {50, 5.f}, {100, 12.f}, {150, 25.f},
+}};
+/// Extra health per level after the first (0.1 = +10% per level).
+constexpr float LEVEL_HEALTH_BONUS = 0.1f;
+
+/// Chance for an enemy to be fast, and its speed multiplier (random in the range).
+constexpr std::array<CurvePoint, 4> FAST_CHANCE = {{
+    {1, 0.05f}, {20, 0.12f}, {50, 0.2f}, {150, 0.3f},
+}};
+constexpr float FAST_SPEED_MIN = 1.2f;
+constexpr float FAST_SPEED_MAX = 1.5f;
+
+/// From GROUP_WAVE on, enemies can spawn at the same time (side by side).
+constexpr int GROUP_WAVE = 10;
+constexpr std::array<CurvePoint, 3> GROUP_CHANCE = {{
+    {10, 0.2f}, {50, 0.4f}, {150, 0.6f},
+}};
+constexpr std::array<CurvePoint, 3> MAX_GROUP = {{
+    {10, 2.f}, {40, 3.f}, {100, 4.f},
+}};
+constexpr float LANE_SPACING = 8.f;
+
 constexpr int MINIBOSS_WAVE = 10;
 constexpr int BOSS_WAVE = 25;
 constexpr int SUPERBOSS_WAVE = 50;
 
-/// Gold when a wave is cleared: 20 + 5 per wave.
+/// Level 1: 50 waves, then +10 per level (150 max).
+constexpr int FIRST_LEVEL_WAVES = 50;
+constexpr int WAVES_PER_LEVEL = 10;
+constexpr int MAX_LEVEL_WAVES = 150;
+
 int bonusGoldFor(int wave)
 {
     return 20 + (5 * wave);
 }
 
-/// 1 skill point per wave, 3 every 10th wave.
-int skillPointsFor(int wave)
+/// 1 point every 10 waves, +3 for clearing the level.
+constexpr int LEVEL_CLEAR_POINTS = 3;
+int skillPointsFor(int wave, int level)
 {
-    return wave % 10 == 0 ? 3 : 1;
+    return (wave % 10 == 0 ? 1 : 0) + (wave == levelWaves(level) ? LEVEL_CLEAR_POINTS : 0);
 }
 
 }  // namespace
@@ -103,7 +132,12 @@ int unlockWave(Rank rank)
     return 1;
 }
 
-WavePlan planForWave(int wave)
+int levelWaves(int level)
+{
+    return std::min(FIRST_LEVEL_WAVES + (WAVES_PER_LEVEL * (std::max(level, 1) - 1)), MAX_LEVEL_WAVES);
+}
+
+WavePlan planForWave(int wave, int level)
 {
     WavePlan plan;
     plan.wave = wave;
@@ -116,15 +150,24 @@ WavePlan planForWave(int wave)
     plan.rankShare[static_cast<std::size_t>(Rank::SuperBoss)] =
         share(Rank::SuperBoss, SUPERBOSS_SHARE);
     plan.elementalFactor = interpolate(ELEMENTAL_FACTOR, wave);
+    plan.health = interpolate(HEALTH, wave) *
+                  (1.f + (LEVEL_HEALTH_BONUS * static_cast<float>(std::max(level, 1) - 1)));
+    plan.fastChance = interpolate(FAST_CHANCE, wave);
+    if (wave >= GROUP_WAVE)
+    {
+        plan.groupChance = interpolate(GROUP_CHANCE, wave);
+        plan.maxGroup = static_cast<int>(interpolate(MAX_GROUP, wave));
+    }
     plan.bonusGold = bonusGoldFor(wave);
-    plan.skillPoints = skillPointsFor(wave);
+    plan.skillPoints = skillPointsFor(wave, level);
     return plan;
 }
 
 // ── LevelManager ──────────────────────────────────────────────────────────────
 
-LevelManager::LevelManager(WaveManager& waveManager, EnemyFactory& factory, std::uint32_t seed)
-    : waveManager_(waveManager), factory_(factory), rng_(seed)
+LevelManager::LevelManager(WaveManager& waveManager, EnemyFactory& factory, std::uint32_t seed,
+                           int level)
+    : waveManager_(waveManager), factory_(factory), rng_(seed), level_(std::clamp(level, 1, LEVEL_COUNT))
 {
 }
 
@@ -143,7 +186,7 @@ void LevelManager::update(float dt)
             if (waveManager_.isWaveComplete())
             {
                 EventBus::instance().emit(WaveCompleted{wave_, plan_.bonusGold, plan_.skillPoints});
-                if (wave_ >= LEVEL_WAVES)
+                if (wave_ >= totalWaves())
                 {
                     phase_ = Phase::Victory;
                 }
@@ -170,7 +213,7 @@ void LevelManager::startNextWaveNow()
 void LevelManager::startWave()
 {
     ++wave_;
-    plan_ = planForWave(wave_);
+    plan_ = planForWave(wave_, level_);
     phase_ = Phase::Running;
     breakTimer_ = 0.f;
     waveManager_.startWave(wave_, buildWave(plan_));
@@ -213,12 +256,41 @@ WaveData LevelManager::buildWave(const WavePlan& plan)
         std::iter_swap(std::max_element(ranks.begin(), ranks.end()), ranks.end() - 1);
     }
 
+    // Groups: an enemy may come with the previous one, spread on lanes.
+    std::uniform_real_distribution<float> fastSpeed(FAST_SPEED_MIN, FAST_SPEED_MAX);
     WaveData wave;
-    wave.spawnInterval = plan.spawnInterval;
-    for (const Rank rank : ranks)
+    std::size_t groupStart = 0;
+    auto spreadGroup = [&wave](std::size_t first)
     {
-        wave.enemies.push_back({factory_.roll(rank, plan.elementalFactor), 1, 0.f});
+        const auto size = static_cast<float>(wave.enemies.size() - first);
+        for (std::size_t i = first; i < wave.enemies.size(); ++i)
+        {
+            wave.enemies[i].lane = (static_cast<float>(i - first) - ((size - 1.f) / 2.f)) * LANE_SPACING;
+        }
+    };
+    for (std::size_t i = 0; i < ranks.size(); ++i)
+    {
+        SpawnEntry entry{.spec = factory_.roll(ranks[i], plan.elementalFactor),
+                         .boost = {.health = plan.health},
+                         .delay = i == 0 ? 0.f : plan.spawnInterval};
+        if (unit(rng_) < plan.fastChance)
+        {
+            entry.boost.speed = fastSpeed(rng_);
+        }
+        const bool joins = i > 0 && std::cmp_less(i - groupStart, plan.maxGroup) &&
+                           unit(rng_) < plan.groupChance;
+        if (joins)
+        {
+            entry.delay = 0.f;
+        }
+        else
+        {
+            spreadGroup(groupStart);
+            groupStart = i;
+        }
+        wave.enemies.push_back(entry);
     }
+    spreadGroup(groupStart);
     return wave;
 }
 

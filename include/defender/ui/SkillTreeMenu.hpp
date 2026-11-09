@@ -20,7 +20,7 @@ class SkillTreeMenu
 public:
     explicit SkillTreeMenu(sf::Vector2f screenSize);
 
-    void render(sf::RenderTarget& target, const SkillTree& tree, const Player& player,
+    void render(sf::RenderTarget& target, const SkillTree& tree,
                 sf::Vector2f mouse) const;
     /// Handles a click at `point`. Returns true if the menu must close.
     bool click(sf::Vector2f point, SkillTree& tree, Player& player);

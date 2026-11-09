@@ -81,22 +81,27 @@ void Player::addMaxShield(float amount)
     shield_ = std::min(shield_ + amount, maxShield_);
 }
 
-bool Player::spendSkillPoints(int amount)
+namespace
 {
-    if (amount < 0 || amount > skillPoints_)
-    {
-        return false;
-    }
-    skillPoints_ -= amount;
-    return true;
+
+int scaled(int amount, float multiplier)
+{
+    return static_cast<int>(std::lround(static_cast<float>(amount) * multiplier));
 }
 
-int Player::completeWave(int bonusGold, int skillPoints)
+}  // namespace
+
+int Player::earnKill(int reward)
 {
-    const auto gold = static_cast<int>(std::lround(static_cast<float>(bonusGold) *
-                                                   waveGoldMultiplier_));
+    const int gold = scaled(reward, killGoldMultiplier_);
     earn(gold);
-    addSkillPoints(skillPoints);
+    return gold;
+}
+
+int Player::completeWave(int bonusGold)
+{
+    const int gold = scaled(bonusGold, waveGoldMultiplier_);
+    earn(gold);
     refillShield();
     return gold;
 }
